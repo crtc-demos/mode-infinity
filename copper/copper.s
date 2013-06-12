@@ -62,7 +62,7 @@ loop
 	lda #0b01011101
 	sta (%ptr),y
 	iny
-	lda #0b10101010
+	lda #0b11101010
 	sta (%ptr),y
 	iny
 	lda #0b11101110
@@ -217,6 +217,9 @@ timer1
 	; Clear interrupt
 	lda USR_T1C_L
 
+	phx
+	phy
+
 	; Latch next timeout
 	lda #<[64*2-2]
 	sta USR_T1L_L
@@ -239,13 +242,13 @@ not_last
 	.)
 	clc
 	adc magic_offset
-	and #31
+	and #63
 	asl a
 	tax
 	jmp (selectpal,x)
 
 fliptime
-	.word 64 * 28 + 46
+	.word 64 * 28 + 37
 
 vsync
 	phx
@@ -327,56 +330,61 @@ selectpal
 	.word pal29
 	.word pal30
 	.word pal31
+	.word pal32
+	.word pal33
+	.word pal34
+	.word pal35
+	.word pal36
+	.word pal37
+	.word pal38
+	.word pal39
+	.word pal40
+	.word pal41
+	.word pal42
+	.word pal43
+	.word pal44
+	.word pal45
+	.word pal46
+	.word pal47
+	.word pal48
+	.word pal49
+	.word pal50
+	.word pal51
+	.word pal52
+	.word pal53
+	.word pal54
+	.word pal55
+	.word pal56
+	.word pal57
+	.word pal58
+	.word pal59
+	.word pal60
+	.word pal61
+	.word pal62
+	.word pal63
 
 	.macro palette a b c d f h i k l p
-	lda #0b00000000 | %a ^ 7 : sta PALCONTROL	; A
-	lda #0b00010000 | %b ^ 7 : sta PALCONTROL	; B
-	lda #0b00100000 | %c ^ 7 : sta PALCONTROL	; C
-	lda #0b00110000 | %d ^ 7 : sta PALCONTROL	; D
-	lda #0b01010000 | %f ^ 7 : sta PALCONTROL	; F
-	lda #0b01110000 | %h ^ 7 : sta PALCONTROL	; H
-	lda #0b10000000 | %i ^ 7 : sta PALCONTROL	; I
-	lda #0b10100000 | %k ^ 7 : sta PALCONTROL	; K
-	lda #0b10110000 | %l ^ 7 : sta PALCONTROL	; L
-	lda #0b11110000 | %p ^ 7 : sta PALCONTROL	; P
+	ldx #0b10110111 ^ %l
+	ldy #0b11110111 ^ %p
+	lda #0b00000111 ^ %a : sta PALCONTROL	    ; A
+	lda #0b00010111 ^ %b : sta PALCONTROL	    ; B
+	lda #0b00100111 ^ %c : sta PALCONTROL	    ; C
+	lda #0b00110111 ^ %d : sta PALCONTROL	    ; D
+	lda #0b01010111 ^ %f : sta PALCONTROL	    ; F
+	lda #0b01110111 ^ %h : sta PALCONTROL	    ; H
+	lda #0b10000111 ^ %i : sta PALCONTROL	    ; I
+	lda #0b10100111 ^ %k : sta PALCONTROL	    ; K
+	stx PALCONTROL				    ; L
+	sty PALCONTROL				    ; P
 
+	ply
+	plx
 	pla
 	sta $fc
 	rti
 	.mend
 
-pal0:	@palette 1,1,1,1,1,1,1,1,1,1
-pal1:	@palette 3,1,1,1,1,1,3,1,3,1
-pal2:	@palette 1,3,1,1,3,3,1,1,1,1
-pal3:	@palette 3,3,1,1,3,3,3,1,3,1
-pal4:	@palette 3,3,3,3,3,3,3,3,3,1
-pal5:	@palette 1,1,3,3,1,1,1,3,1,3
-pal6:	@palette 3,1,3,3,1,1,3,3,3,3
-pal7:	@palette 1,3,3,3,3,3,1,3,1,3
-pal8:	@palette 3,3,3,3,3,3,3,3,3,3
-pal9:	@palette 2,3,3,3,3,3,2,3,2,3
-pal10:	@palette 3,2,3,3,2,2,3,3,3,3
-pal11:	@palette 2,2,3,3,2,2,2,3,2,3
-pal12:	@palette 2,2,2,2,2,2,2,2,2,3
-pal13:	@palette 3,3,2,2,3,3,3,2,3,2
-pal14:	@palette 2,3,2,2,3,3,2,2,2,2
-pal15:	@palette 3,2,2,2,2,2,3,2,3,2
-pal16:	@palette 2,2,2,2,2,2,2,2,2,2
-pal17:	@palette 6,2,2,2,2,2,6,2,6,2
-pal18:	@palette 2,6,2,2,6,6,2,2,2,2
-pal19:	@palette 6,6,2,2,6,6,6,2,6,2
-pal20:	@palette 6,6,6,6,6,6,6,6,6,2
-pal21:	@palette 2,2,6,6,2,2,2,6,2,6
-pal22:	@palette 6,2,6,6,2,2,6,6,6,6
-pal23:	@palette 2,6,6,6,6,6,2,6,2,6
-pal24:	@palette 6,6,6,6,6,6,6,6,6,6
-pal25:	@palette 4,6,6,6,6,6,4,6,4,6
-pal26:	@palette 6,4,6,6,4,4,6,6,6,6
-pal27:	@palette 4,4,6,6,4,4,4,6,4,6
-pal28:	@palette 4,4,4,4,4,4,4,4,4,6
-pal29:	@palette 6,6,4,4,6,6,6,4,6,4
-pal30:	@palette 4,6,4,4,6,6,4,4,4,4
-pal31:	@palette 6,4,4,4,4,4,6,4,6,4
+	.include "palette"
 
 
 ; Now, we have:
@@ -464,7 +472,7 @@ pal31:	@palette 6,4,4,4,4,4,6,4,6,4
 
 	.context setpalette
 setpalette
-	jmp twoway2_375
+	jmp twoway2_25_2
 	
 	lda #155
 	ldx #0b00000001 : jsr osbyte
@@ -560,6 +568,27 @@ twoway2_25
 	ldx #0b10010001 : jsr osbyte		; J
 	ldx #0b10100001 : jsr osbyte		; K
 	ldx #0b10110001 : jsr osbyte		; L
+	ldx #0b11000001 : jsr osbyte		; M
+	ldx #0b11010001 : jsr osbyte		; N
+	ldx #0b11100001 : jsr osbyte		; O
+	ldx #0b11110001 : jsr osbyte		; P
+	rts
+
+twoway2_25_2
+	lda #155
+	ldx #0b00000011 : jsr osbyte		; A
+	ldx #0b00010011 : jsr osbyte		; B
+	ldx #0b00100011 : jsr osbyte		; C
+	ldx #0b00110001 : jsr osbyte		; D
+	ldx #0b01000001 : jsr osbyte		; E
+	ldx #0b01010001 : jsr osbyte		; F
+	ldx #0b01100001 : jsr osbyte		; G
+	ldx #0b01110001 : jsr osbyte		; H
+
+	ldx #0b10000001 : jsr osbyte		; I
+	ldx #0b10010001 : jsr osbyte		; J
+	ldx #0b10100011 : jsr osbyte		; K
+	ldx #0b10110011 : jsr osbyte		; L
 	ldx #0b11000001 : jsr osbyte		; M
 	ldx #0b11010001 : jsr osbyte		; N
 	ldx #0b11100001 : jsr osbyte		; O
