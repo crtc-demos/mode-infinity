@@ -71,10 +71,10 @@ let pi = 4.0 *. atan 1.0
 let _ =
   for i = 0 to 63 do
     let fi = (float_of_int i) /. 63.0 in
-    let r = int_of_float (20.0 +. sin (fi *. 2.0 *. pi) *. 12.0)
-    and g = int_of_float (20.0 +. sin (fi *. 2.0 *. pi +. 2.0 *. pi /. 3.0)
+    let r = int_of_float (16.0 +. sin (fi *. 2.0 *. pi) *. 16.0)
+    and g = int_of_float (16.0 +. sin (fi *. 4.0 *. pi +. 2.0 *. pi /. 3.0)
 				  *. 12.0)
-    and b = int_of_float (20.0 +. sin (fi *. 2.0 *. pi +. 4.0 *. pi /. 3.0)
-				  *. 12.0) in
+    and b = int_of_float (16.0 +. sin (fi *. 2.0 *. pi +. 4.0 *. pi /. 3.0)
+				  *. 16.0) in
     Printf.printf "pal%d: @palette %s\n" i (choose_best r g b)
   done
