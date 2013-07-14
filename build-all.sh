@@ -8,12 +8,24 @@ else
   PASTA=/home/jules/code/pasta/pasta
 fi
 
-BBCIM=$(which bbcim)
+if [ -x "$(which bbcim)" ]; then
+  BBCIM=$(which bbcim)
+else
+  if ! [ -x bbcim/bbcim ]; then
+    pushd bbcim
+    ./mkbbcim
+    popd
+  fi
+  BBCIM=$(readlink -f bbcim/bbcim)
+fi
 
 if [ ! -x "$PASTA" ] || [ ! -x "$BBCIM" ]; then
   echo 'Missing pasta or bbcim! Whoops.'
   exit 1
 fi
+
+export PASTA
+export BBCIM
 
 OUTPUTDISK=$(readlink -f tmpdisk)
 
@@ -30,7 +42,7 @@ pushd copper
 ./compile.sh
 popd
 
-bbcim -new demodisk.ssd
+$BBCIM -new demodisk.ssd
 pushd tmpdisk
-bbcim -a ../demodisk.ssd *
+$BBCIM -a ../demodisk.ssd *
 popd
