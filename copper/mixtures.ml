@@ -32,7 +32,7 @@ let index letter =
 
 let choose_best r g b =
   let mix_len = Array.length mixtures in
-  let best_dist = ref max_int
+  let best_dist = ref infinity
   and best_colour_mix = ref None in
   for mix = 0 to mix_len - 1 do
     let col1_wt, col2_wt, _, _ = mixtures.(mix) in
@@ -43,12 +43,13 @@ let choose_best r g b =
 	  let r1, g1, b1 = rgb_for_col col1 col1_wt
 	  and r2, g2, b2 = rgb_for_col col2 col2_wt
 	  and r3, g3, b3 = rgb_for_col col3 col3_wt in
-	  let diff_r = (r1 + r2 + r3) - r
-	  and diff_g = (g1 + g2 + g3) - g
-	  and diff_b = (b1 + b2 + b3) - b in
-	  let sqdist = diff_r * diff_r + diff_g * diff_g + diff_b * diff_b in
-	  if sqdist < !best_dist then begin
-	    best_dist := sqdist;
+	  let diff_r = float_of_int ((r1 + r2 + r3) - r) *. 0.2989
+	  and diff_g = float_of_int ((g1 + g2 + g3) - g) *. 0.5870
+	  and diff_b = float_of_int ((b1 + b2 + b3) - b) *. 0.1140 in
+	  let dist = sqrt (diff_r *. diff_r +. diff_g *. diff_g
+			   +. diff_b *. diff_b) in
+	  if dist < !best_dist then begin
+	    best_dist := dist;
 	    best_colour_mix := Some (col1, col2, col3, mix)
 	  end
 	done
@@ -72,9 +73,9 @@ let _ =
   for i = 0 to 63 do
     let fi = (float_of_int i) /. 63.0 in
     let r = int_of_float (16.0 +. sin (fi *. 2.0 *. pi) *. 16.0)
-    and g = int_of_float (16.0 +. sin (fi *. 4.0 *. pi +. 2.0 *. pi /. 3.0)
-				  *. 12.0)
-    and b = int_of_float (16.0 +. sin (fi *. 2.0 *. pi +. 4.0 *. pi /. 3.0)
+    and g = int_of_float (16.0 +. sin (fi *. 2.0 *. pi +. 1.0 *. pi /. 3.0)
+				  *. 16.0)
+    and b = int_of_float (16.0 +. sin (fi *. 2.0 *. pi +. 2.0 *. pi /. 3.0)
 				  *. 16.0) in
     Printf.printf "pal%d: @palette %s\n" i (choose_best r g b)
   done
