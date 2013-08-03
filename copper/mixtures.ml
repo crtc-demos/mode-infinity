@@ -69,7 +69,7 @@ let choose_best r g b =
 
 let pi = 4.0 *. atan 1.0
 
-let _ =
+let foo () =
   for i = 0 to 63 do
     let fi = (float_of_int i) /. 63.0 in
     let r = int_of_float (16.0 +. sin (fi *. 2.0 *. pi) *. 16.0)
@@ -78,4 +78,13 @@ let _ =
     and b = int_of_float (16.0 +. sin (fi *. 2.0 *. pi +. 2.0 *. pi /. 3.0)
 				  *. 16.0) in
     Printf.printf "pal%d: @palette %s\n" i (choose_best r g b)
+  done
+
+let _ =
+  for r = 0 to 31 do
+    for g = 0 to 31 do
+      for b = 0 to 31 do
+        Printf.printf "%s\n" (choose_best r g b)
+      done
+    done
   done
