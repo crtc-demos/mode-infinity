@@ -42,6 +42,10 @@ pushd copper
 ./compile.sh
 popd
 
+pushd parallax
+./compile.sh
+popd
+
 $BBCIM -new demodisk.ssd
 pushd tmpdisk
 $BBCIM -a ../demodisk.ssd *
