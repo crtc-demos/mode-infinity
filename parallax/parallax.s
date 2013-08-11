@@ -1,6 +1,6 @@
-	.org $e00
+	.org $e05
 	
-	.temps $70..$8d
+	.temps $70..$7f
 	
 start:
 	lda #2
@@ -9,7 +9,7 @@ start:
 	jsr blocks
 	jsr initvsync
 spin
-	jmp spin
+	;jmp spin
 	rts
 	
 	.include "../lib/mos.s"
@@ -25,7 +25,7 @@ stripes
 loop:
 	ldy #0
 loop2:
-	lda #$11
+	lda SYS_T1C_L
 	sta (%ptr),y
 	iny
 	bne loop2
@@ -37,6 +37,13 @@ loop2:
 	
 	.)
 	.ctxend
+	
+	.macro crtc_write addr data
+	lda #%addr
+	sta CRTC_ADDR
+	lda %data
+	sta CRTC_DATA
+	.mend
 	
 	.context blocks
 blocks:
@@ -88,17 +95,23 @@ initvsync
         
 	; Disable Sys CB1, CB2, timer1 interrupts
 	; Note turning off sys timer1 interrupt breaks a lot of stuff!
-	lda #0b01011000
+	;lda #0b01011000
 	; CB1 & CB2 only
-	;lda #0b00011000
+	lda #0b00011000
 	; or everything!
 	;lda #0b01111101
 	sta SYS_IER
 
         cli
         
+	lda #0
+	sta v_offset
+	
         rts
 	.)
+
+v_offset
+	.byte 0
 
 old_sys_ier
 	.byte 0
@@ -130,25 +143,49 @@ timer1
 	phy
 
 	; Latch next timeout
-	lda #<[64*2-2]
-	sta USR_T1L_L
-	lda #>[64*2-2]
-	sta USR_T1L_H
+	;lda #<[64*128-2]
+	;sta USR_T1L_L
+	;lda #>[64*128-2]
+	;sta USR_T1L_H
 
 	.(
 	lda first_after_vsync
-	bne not_last
+	beq disable_irq
+	
+	; First IRQ in the new CRTC cycle: set some registers
+	; CRTC cycle length = 16 rows
+	@crtc_write 4, {#15}
+	@crtc_write 6, {#16}
+	@crtc_write 7, {#255}
+	lda #5
+	sta CRTC_ADDR
+	lda v_offset
+	and #7
+	eor #7
+	inc a
+	sta CRTC_DATA
 
+	@crtc_write 12, {#>[$3000/8]}
+	@crtc_write 13, {#<[$3000/8]}
+
+	stz first_after_vsync
+
+	bra not_last
+
+disable_irq
 	; Disable usr timer1 interrupt
 	lda #0b01000000
 	sta USR_IER
 	lda #255
 	sta USR_T1L_L
 	sta USR_T1L_H
+	
+	; 22 more rows
+	@crtc_write 4, {#21}
+	@crtc_write 6, {#16}
+	@crtc_write 7, {#18}
 not_last
 	.)
-
-	stz first_after_vsync
 
 	ply
 	plx
@@ -156,11 +193,14 @@ not_last
 	sta $fc
 	rti
 
-fliptime
-	.word 64 * 28 + 37
+new_cycle_time
+	.word 64 * 40
 
 first_after_vsync
 	.byte 0
+
+	.alias tmp $80
+	.alias tmp2 $82
 
 vsync
 	phx
@@ -169,15 +209,17 @@ vsync
 	; Clear interrupt
 	lda USR_T1C_L
 
-        ; Trigger after 'fliptime' microseconds
-        lda fliptime
+        ; Trigger after 'new_cycle_time' microseconds
+        lda new_cycle_time
         sta USR_T1C_L
-        lda fliptime+1
+        lda new_cycle_time+1
         sta USR_T1C_H
 
-	lda #<[64*2-2]
+	; Latch the time for the subsequent flip -- for the secondary CRTC
+	; cycle.
+	lda #<[64*128-2]
 	sta USR_T1L_L
-	lda #>[64*2-2]
+	lda #>[64*128-2]
 	sta USR_T1L_H
 
 	; Clear IFR
@@ -196,11 +238,61 @@ vsync
 	lda #1
 	sta first_after_vsync
 
+	inc v_offset
+
+	;@crtc_write 12, {#>[$3000/8]}
+	;@crtc_write 13, {#<[$3000/8]}
+	
+	; tmp = (v_offset & 7) << 1
+	stz tmp+1
+	lda v_offset
+	and #$78
+	asl a
+	rol tmp+1
+	sta tmp
+	
+	; tmp2 = tmp << 2
+	stz tmp2+1
+	lda tmp
+	asl a
+	rol tmp2+1
+	asl a
+	rol tmp2+1
+	sta tmp2
+	
+	; tmp += tmp2
+	lda tmp
+	clc
+	adc tmp2
+	sta tmp
+	lda tmp+1
+	adc tmp2+1
+	sta tmp+1
+	
+	lda #13
+	sta CRTC_ADDR
+	lda #<[$3000/8]
+	sec
+	sbc tmp 
+	sta CRTC_DATA
+	
+	lda #12
+	sta CRTC_ADDR
+	lda #>[$3000/8]
+	sbc tmp+1
+	sta CRTC_DATA
+	
+	lda #5
+	sta CRTC_ADDR
+	lda v_offset
+	and #7
+	sta CRTC_DATA
+
 	; gtfo
 	ply
 	plx
 	pla
 	sta $fc
 	rti
-	; jmp (oldirq1v)
+	;jmp (oldirq1v)
 	.)

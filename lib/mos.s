@@ -5,6 +5,9 @@
 	.alias osfile $ffdd
 	.alias oscli $fff7
 
+	.alias CRTC_ADDR $fe00
+	.alias CRTC_DATA $fe01
+
 	.alias SYS_ORB $fe40
 	.alias SYS_ORA $fe41
 	.alias SYS_DDRB $fe42
