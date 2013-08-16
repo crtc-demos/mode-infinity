@@ -20,28 +20,115 @@ spin
 	
 	.context stripes
 	.var2 ptr
+	.var xpos
+	.var stripecol
 stripes
 	lda #<$3000
 	sta %ptr
 	lda #>$3000
 	sta %ptr+1
-	.(
-loop:
-	ldy #0
-loop2:
-	lda SYS_T1C_L
-	sta (%ptr),y
-	iny
-	bne loop2
 	
-	inc %ptr+1
+	stz %xpos
+	stz %stripecol
+	
+xloop
+	lda %ptr
+	sta %draw_column.column_top
 	lda %ptr+1
-	cmp #$80
-	bne loop
+	sta %draw_column.column_top+1
+	lda %stripecol
+	sta %draw_column.stripe_idx
+	jsr draw_column
 	
-	.)
+	lda %ptr
+	clc
+	adc #8
+	sta %ptr
+	.(
+	bcc nohi
+	inc %ptr+1
+nohi:	.)
+
+	.(
+	inc %stripecol
+	lda %stripecol
+	cmp #12
+	bne skip
+	stz %stripecol
+skip:	.)
+
+	inc %xpos
+	lda %xpos
+	cmp #80
+	bne xloop
+	
+	rts
 	.ctxend
 	
+stripecolour
+	.byte [0b0000000 << 1] | 0b0000000
+	.byte [0b0000000 << 1] | 0b0000001
+	.byte [0b0000001 << 1] | 0b0000001
+	.byte [0b0000100 << 1] | 0b0000100
+	.byte [0b0000100 << 1] | 0b0000101
+	.byte [0b0000101 << 1] | 0b0000101
+	.byte [0b0010000 << 1] | 0b0010000
+	.byte [0b0010000 << 1] | 0b0010001
+	.byte [0b0010001 << 1] | 0b0010001
+	.byte [0b0010100 << 1] | 0b0010100
+	.byte [0b0010100 << 1] | 0b0010101
+	.byte [0b0010101 << 1] | 0b0010101
+
+	.context draw_column
+	; args -- column_top is clobbered.
+	.var2 column_top
+	.var stripe_idx
+	; locals
+	.var stripecol
+	.var blocknum
+draw_column
+	ldy %stripe_idx
+	lda stripecolour,y
+	sta %stripecol
+	lda #32
+	sta %blocknum
+loop
+	lda %stripecol
+	ldy #0 : sta (%column_top),y
+	ldy #1 : sta (%column_top),y
+	ldy #2 : sta (%column_top),y
+	ldy #3 : sta (%column_top),y
+	ldy #4 : sta (%column_top),y
+	ldy #5 : sta (%column_top),y
+	ldy #6 : sta (%column_top),y
+	ldy #7 : sta (%column_top),y
+	
+	lda %column_top
+	clc
+	adc #<640
+	sta %column_top
+	lda %column_top+1
+	adc #>640
+	sta %column_top+1
+	
+	.(
+	; lda %column_top+1
+	cmp #$80
+	bne nowrap
+	
+	; lda %column_top+1
+	clc
+	adc #>[$8000-$3000]
+	sta %column_top+1
+	
+nowrap:	.)
+
+	dec %blocknum
+	bne loop
+	
+	rts
+	.ctxend
+
 	.macro crtc_write addr data
 	lda #%addr
 	sta CRTC_ADDR
