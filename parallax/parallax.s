@@ -10,8 +10,9 @@
 	; handling IRQ contexts properly.)
 	.alias tmp $80
 	.alias tmp2 $82
-	.alias pal_ptr $84
-	.alias offset $86
+	.alias tmp3 $84
+	.alias pal_ptr $86
+	.alias offset $88
 	
 start:
 	lda #2
@@ -546,19 +547,62 @@ skip:	.)
 	; Called from IRQ, can't be context! Be careful with 'tmp' usage.
 set_hwscroll:
 	.(
+	; tmp3 = start_addr / 8
 	lda start_addr+1
-	sta tmp+1
+	sta tmp3+1
 	lda start_addr
-	lsr tmp+1
+	lsr tmp3+1
 	ror a
-	lsr tmp+1
+	lsr tmp3+1
 	ror a
-	lsr tmp+1
+	lsr tmp3+1
 	ror a
+	sta tmp3
+	
+	; tmp = (v_offset & ~7) << 1
+	stz tmp+1
+	lda v_offset
+	and #$f8
+	asl a
+	rol tmp+1
 	sta tmp
 	
-	@crtc_write 13, tmp
-	@crtc_write 12, tmp+1
+	; tmp2 = tmp << 2
+	lda tmp+1
+	sta tmp2+1
+	lda tmp
+	asl a
+	rol tmp2+1
+	asl a
+	rol tmp2+1
+	sta tmp2
+	
+	; tmp += tmp2  (tmp = v_row * 80)
+	lda tmp
+	clc
+	adc tmp2
+	sta tmp
+	lda tmp+1
+	adc tmp2+1
+	sta tmp+1
+	
+	lda #13
+	sta CRTC_ADDR
+	lda tmp
+	clc
+	adc tmp3
+	sta CRTC_DATA
+	lda #12
+	sta CRTC_ADDR
+	lda tmp+1
+	adc tmp3+1
+	.(
+	cmp #$80/8
+	bcc nowrap
+	clc
+	adc #>[[$3000-$8000]/8]
+nowrap:	.)
+	sta CRTC_DATA
 	
 	rts
 	.)
@@ -887,37 +931,11 @@ vsync
 	lda #1
 	sta first_after_vsync
 
-	;inc v_offset
+	inc v_offset
 
 	;@crtc_write 12, {#>[$3000/8]}
 	;@crtc_write 13, {#<[$3000/8]}
 	
-	; tmp = (v_offset & ~7) << 1
-	stz tmp+1
-	lda v_offset
-	and #$f8
-	asl a
-	rol tmp+1
-	sta tmp
-	
-	; tmp2 = tmp << 2
-	lda tmp+1
-	sta tmp2+1
-	lda tmp
-	asl a
-	rol tmp2+1
-	asl a
-	rol tmp2+1
-	sta tmp2
-	
-	; tmp += tmp2
-	lda tmp
-	clc
-	adc tmp2
-	sta tmp
-	lda tmp+1
-	adc tmp2+1
-	sta tmp+1
 	
 	;lda #13
 	;sta CRTC_ADDR
