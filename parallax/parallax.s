@@ -5,6 +5,11 @@
 	.alias total_lines 39
 	.alias displayed_lines 32
 	.alias top_screen_lines 30
+
+	; These tmps are used from IRQ context. (FIXME: Pasta needs a way of
+	; handling IRQ contexts properly.)
+	.alias tmp $80
+	.alias tmp2 $82
 	
 start:
 	lda #2
@@ -12,7 +17,7 @@ start:
 	jsr stripes
 	jsr blocks
 	jsr action_diffs
-	;jsr initvsync
+	jsr initvsync
 	
 scroll_loop
 	lda #129
@@ -43,7 +48,7 @@ s3:	lda #3
 do_lscroll
 	sta %scroll_left.amount
 	jsr scroll_left
-	jsr set_hwscroll
+	;jsr set_hwscroll
 	bra scroll_loop
 
 l1:	lda #1
@@ -54,7 +59,7 @@ l3:	lda #3
 do_rscroll:
 	sta %scroll_right.amount
 	jsr scroll_right
-	jsr set_hwscroll
+	;jsr set_hwscroll
 
 	bra scroll_loop
 	
@@ -69,6 +74,7 @@ spin
 	.var2 ptr
 	.var xpos
 	.var stripecol
+	.var block
 stripes
 	lda #<$3000
 	sta %ptr
@@ -77,6 +83,7 @@ stripes
 	
 	stz %xpos
 	stz %stripecol
+	stz %block
 	
 xloop
 	lda %ptr
@@ -85,6 +92,8 @@ xloop
 	sta %draw_column.column_top+1
 	lda %stripecol
 	sta %draw_column.stripe_idx
+	lda %block
+	sta %draw_column.block_idx
 	jsr draw_column
 	
 	lda %ptr
@@ -102,6 +111,14 @@ nohi:	.)
 	cmp #12
 	bne skip
 	stz %stripecol
+skip:	.)
+
+	.(
+	inc %block
+	lda %block
+	cmp #96
+	bne skip
+	stz %block
 skip:	.)
 
 	inc %xpos
@@ -130,6 +147,7 @@ stripecolour
 	; args -- column_top is clobbered.
 	.var2 column_top
 	.var stripe_idx
+	.var block_idx
 	; locals
 	.var stripecol
 	.var blocknum
@@ -140,7 +158,19 @@ draw_column
 	lda #32
 	sta %blocknum
 loop
+	lda %block_idx
+	and #16
+	beq stripes
+	lda %blocknum
+	dec
+	and #8
+	beq stripes
+solid
+	lda #[0b1000000 << 1] | 0b1000000
+	bra block
+stripes
 	lda %stripecol
+block
 	ldy #0 : sta (%column_top),y
 	ldy #1 : sta (%column_top),y
 	ldy #2 : sta (%column_top),y
@@ -196,6 +226,10 @@ lhs_col
 	.byte 11
 rhs_col
 	.byte 8
+lhs_blk
+	.byte 95
+rhs_blk
+	.byte 16
 
 	; Scroll screen contents to the left by AMOUNT, filling in columns on
 	; the right-hand side.
@@ -243,6 +277,8 @@ fill_rhs_cols
 	sta %draw_column.column_top+1
 	lda rhs_col
 	sta %draw_column.stripe_idx
+	lda rhs_blk
+	sta %draw_column.block_idx
 	jsr draw_column
 	
 	; Update column address.
@@ -275,6 +311,22 @@ skip:	.)
 	cmp #12
 	bne skip
 	stz rhs_col
+skip:	.)
+	
+	.(
+	inc lhs_blk
+	lda lhs_blk
+	cmp #96
+	bne skip
+	stz lhs_blk
+skip:	.)
+
+	.(
+	inc rhs_blk
+	lda rhs_blk
+	cmp #96
+	bne skip
+	stz rhs_blk
 skip:	.)
 	
 	dec %amount
@@ -339,6 +391,8 @@ fill_lhs_cols
 	sta %draw_column.column_top+1
 	lda lhs_col
 	sta %draw_column.stripe_idx
+	lda lhs_blk
+	sta %draw_column.block_idx
 	jsr draw_column
 	
 	; Update column address.
@@ -375,6 +429,24 @@ skip:	.)
 	sta rhs_col
 skip:	.)
 
+	.(
+	dec lhs_blk
+	lda lhs_blk
+	cmp #$ff
+	bne skip
+	lda #95
+	sta lhs_blk
+skip:	.)
+
+	.(
+	dec rhs_blk
+	lda rhs_blk
+	cmp #$ff
+	bne skip
+	lda #95
+	sta rhs_blk
+skip:	.)
+
 	dec %amount
 	bne fill_lhs_cols
 	
@@ -396,25 +468,25 @@ nowrap:	.)
 	rts
 	.ctxend
 
-	.context set_hwscroll
-	.var2 tmp
+	; Called from IRQ, can't be context! Be careful with 'tmp' usage.
 set_hwscroll:
+	.(
 	lda start_addr+1
-	sta %tmp+1
+	sta tmp+1
 	lda start_addr
-	lsr %tmp+1
+	lsr tmp+1
 	ror a
-	lsr %tmp+1
+	lsr tmp+1
 	ror a
-	lsr %tmp+1
+	lsr tmp+1
 	ror a
-	sta %tmp
+	sta tmp
 	
-	@crtc_write 13, %tmp
-	@crtc_write 12, %tmp+1
+	@crtc_write 13, tmp
+	@crtc_write 12, tmp+1
 	
 	rts
-	.ctxend
+	.)
 
 ; TODO: implement http://www.retrosoftware.co.uk/wiki/index.php/\
 ;   How_to_do_the_smooth_vertical_scrolling
@@ -671,9 +743,6 @@ new_cycle_time
 first_after_vsync
 	.byte 0
 
-	.alias tmp $80
-	.alias tmp2 $82
-
 vsync
 	.(
 	phx
@@ -716,7 +785,7 @@ vsync
 	lda #1
 	sta first_after_vsync
 
-	inc v_offset
+	;inc v_offset
 
 	;@crtc_write 12, {#>[$3000/8]}
 	;@crtc_write 13, {#<[$3000/8]}
@@ -748,18 +817,20 @@ vsync
 	adc tmp2+1
 	sta tmp+1
 	
-	lda #13
-	sta CRTC_ADDR
-	lda #<[$3000/8]
-	clc
-	adc tmp
-	sta CRTC_DATA
+	;lda #13
+	;sta CRTC_ADDR
+	;lda #<[$3000/8]
+	;clc
+	;adc tmp
+	;sta CRTC_DATA
 	
-	lda #12
-	sta CRTC_ADDR
-	lda #>[$3000/8]
-	adc tmp+1
-	sta CRTC_DATA
+	;lda #12
+	;sta CRTC_ADDR
+	;lda #>[$3000/8]
+	;adc tmp+1
+	;sta CRTC_DATA
+	
+	jsr set_hwscroll
 	
 	lda #5
 	sta CRTC_ADDR
