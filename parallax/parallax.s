@@ -11,12 +11,59 @@ start:
 	jsr mos_setmode
 	jsr stripes
 	jsr blocks
-	jsr initvsync
+	jsr action_diffs
+	;jsr initvsync
+	
+scroll_loop
+	lda #129
+	ldx #<1000
+	ldy #>1000
+	jsr osbyte
+	bcs scroll_loop
+	cpx #'Q'
+	beq spin
+	cpx #'1'
+	beq s1
+	cpx #'2'
+	beq s2
+	cpx #'3'
+	beq s3
+	cpx #'7'
+	beq l1
+	cpx #'8'
+	beq l2
+	cpx #'9'
+	beq l3
+	bra scroll_loop
+s1:	lda #1
+	bra do_lscroll
+s2:	lda #2
+	bra do_lscroll
+s3:	lda #3
+do_lscroll
+	sta %scroll_left.amount
+	jsr scroll_left
+	jsr set_hwscroll
+	bra scroll_loop
+
+l1:	lda #1
+	bra do_rscroll
+l2:	lda #2
+	bra do_rscroll
+l3:	lda #3
+do_rscroll:
+	sta %scroll_right.amount
+	jsr scroll_right
+	jsr set_hwscroll
+
+	bra scroll_loop
+	
 spin
 	;jmp spin
 	rts
 	
 	.include "../lib/mos.s"
+	.include "../lib/cmp.s"
 	
 	.context stripes
 	.var2 ptr
@@ -114,11 +161,11 @@ loop
 	.(
 	; lda %column_top+1
 	cmp #$80
-	bne nowrap
+	bcc nowrap
 	
 	; lda %column_top+1
 	clc
-	adc #>[$8000-$3000]
+	adc #>[$3000-$8000]
 	sta %column_top+1
 	
 nowrap:	.)
@@ -138,6 +185,234 @@ nowrap:	.)
 	
 	.context blocks
 blocks:
+	rts
+	.ctxend
+
+start_addr
+	.word $3000
+	; These are the "next" columns to draw on the lhs/rhs, i.e. after
+	; scrolling one column.
+lhs_col
+	.byte 11
+rhs_col
+	.byte 8
+
+	; Scroll screen contents to the left by AMOUNT, filling in columns on
+	; the right-hand side.
+	.context scroll_left
+	; args. Clobbered.
+	.var amount
+	; temps
+	.var2 tmp, rhs_col_addr
+
+scroll_left:
+	lda %amount
+	; Set %tmp to amount * 8.
+	stz %tmp+1
+	asl a
+	rol %tmp+1
+	asl a
+	rol %tmp+1
+	asl a
+	rol %tmp+1
+	sta %tmp
+	
+	; The first column to fill is start_addr + 640. Set
+	; %rhs_col_addr to this.
+	lda start_addr
+	clc
+	adc #<640
+	sta %rhs_col_addr
+	lda start_addr+1
+	adc #>640
+	sta %rhs_col_addr+1
+	
+	cmp #$80
+	bcc fill_rhs_cols
+	
+	; Perform wrap-around. We only need to touch the MSB.
+	lda %rhs_col_addr+1
+	clc
+	adc #>[$3000-$8000]
+	sta %rhs_col_addr+1
+	
+fill_rhs_cols
+	lda %rhs_col_addr
+	sta %draw_column.column_top
+	lda %rhs_col_addr+1
+	sta %draw_column.column_top+1
+	lda rhs_col
+	sta %draw_column.stripe_idx
+	jsr draw_column
+	
+	; Update column address.
+	lda %rhs_col_addr
+	clc
+	adc #8
+	sta %rhs_col_addr
+	.(
+	lda %rhs_col_addr+1
+	adc #0
+	cmp #$80
+	bcc nowrap
+	clc
+	adc #>[$3000-$8000]
+nowrap:	.)
+	sta %rhs_col_addr+1
+	
+	; Update lhs/rhs column indices.
+	.(
+	inc lhs_col
+	lda lhs_col
+	cmp #12
+	bne skip
+	stz lhs_col
+skip:	.)
+
+	.(
+	inc rhs_col
+	lda rhs_col
+	cmp #12
+	bne skip
+	stz rhs_col
+skip:	.)
+	
+	dec %amount
+	bne fill_rhs_cols
+
+	; Change the start address.	
+	lda start_addr
+	clc
+	adc %tmp
+	sta start_addr
+	lda start_addr+1
+	adc %tmp+1
+	.(
+	cmp #$80
+	bcc nowrap
+	clc
+	adc #>[$3000-$8000]
+nowrap:	.)
+	sta start_addr+1
+
+	rts
+	.ctxend
+
+	.context scroll_right
+	; args. Clobbered.
+	.var amount
+	; temps
+	.var2 tmp, lhs_col_addr
+
+scroll_right:
+	lda %amount
+	stz %tmp+1
+	asl a
+	rol %tmp+1
+	asl a
+	rol %tmp+1
+	asl a
+	rol %tmp+1
+	sta %tmp
+	
+	; The first column to fill is start_addr - 8. Set %lhs_col_addr to this.
+	lda start_addr
+	sec
+	sbc #8
+	sta %lhs_col_addr
+	lda start_addr+1
+	sbc #0
+	sta %lhs_col_addr+1
+	
+	cmp #$30
+	bcs fill_lhs_cols
+	
+	; Perform wrap-around.
+	clc
+	adc #>[$8000-$3000]
+	sta %lhs_col_addr+1
+
+fill_lhs_cols
+	lda %lhs_col_addr
+	sta %draw_column.column_top
+	lda %lhs_col_addr+1
+	sta %draw_column.column_top+1
+	lda lhs_col
+	sta %draw_column.stripe_idx
+	jsr draw_column
+	
+	; Update column address.
+	lda %lhs_col_addr
+	sec
+	sbc #8
+	sta %lhs_col_addr
+	.(
+	lda %lhs_col_addr+1
+	sbc #0
+	cmp #$30
+	bcs nowrap
+	clc
+	adc #>[$8000-$3000]
+nowrap:	.)
+	sta %lhs_col_addr+1
+
+	; Update lhs/rhs column indices.
+	.(
+	dec lhs_col
+	lda lhs_col
+	cmp #$ff
+	bne skip
+	lda #11
+	sta lhs_col
+skip:	.)
+
+	.(
+	dec rhs_col
+	lda rhs_col
+	cmp #$ff
+	bne skip
+	lda #11
+	sta rhs_col
+skip:	.)
+
+	dec %amount
+	bne fill_lhs_cols
+	
+	; Change the start address.
+	lda start_addr
+	sec
+	sbc %tmp
+	sta start_addr
+	lda start_addr+1
+	sbc %tmp+1
+	.(
+	cmp #$30
+	bcs nowrap
+	clc
+	adc #>[$8000-$3000]
+nowrap:	.)
+	sta start_addr+1
+	
+	rts
+	.ctxend
+
+	.context set_hwscroll
+	.var2 tmp
+set_hwscroll:
+	lda start_addr+1
+	sta %tmp+1
+	lda start_addr
+	lsr %tmp+1
+	ror a
+	lsr %tmp+1
+	ror a
+	lsr %tmp+1
+	ror a
+	sta %tmp
+	
+	@crtc_write 13, %tmp
+	@crtc_write 12, %tmp+1
+	
 	rts
 	.ctxend
 
@@ -209,6 +484,88 @@ old_sys_ier
 oldirq1v
 	.word 0
 
+	.alias SECOND_CYCLE_SETUP 0
+	.alias INSIDE_BOXES 1
+	.alias OUTSIDE_BOXES 2
+	.alias FIRST_CYCLE_SETUP 3
+
+action_num
+	.byte 0
+
+	.alias MAX_ACTION 10
+
+	; These are preprocessed by action_diffs.
+action_times
+	.word 0
+	.word 64*24-2
+	.word 64*24*2-2
+	.word 64*24*3-2
+	.word 64*24*4-2
+	.word 64*24*5-2
+	.word 64*24*6-2
+	.word 64*24*7-2
+	.word 64*24*8-2
+	.word 64*24*9-2
+	.word 64*8*top_screen_lines-2
+last_action
+
+action_time_diffs
+	.dsb [MAX_ACTION+1]*2,0
+
+action_types
+	.byte FIRST_CYCLE_SETUP
+	.byte INSIDE_BOXES
+	.byte OUTSIDE_BOXES
+	.byte INSIDE_BOXES
+	.byte OUTSIDE_BOXES
+	.byte INSIDE_BOXES
+	.byte OUTSIDE_BOXES
+	.byte INSIDE_BOXES
+	.byte OUTSIDE_BOXES
+	.byte INSIDE_BOXES
+	.byte SECOND_CYCLE_SETUP
+
+	.macro latch_action
+	lda action_num
+	asl a
+	tay
+	lda action_time_diffs,y
+	sta USR_T1L_L
+	iny
+	lda action_time_diffs,y
+	sta USR_T1L_H
+	.mend
+	
+	.macro next_action
+	inc action_num
+	.mend
+
+	.context action_diffs
+	.var ctr
+action_diffs
+	ldx #0
+	stx %ctr
+	ldy #2
+loop
+	lda action_times,y
+	sec
+	sbc action_times,x
+	sta action_time_diffs,x
+	inx
+	iny
+	lda action_times,y
+	sbc action_times,x
+	sta action_time_diffs,x
+	inx
+	iny
+	inc %ctr
+	lda %ctr
+	cmp #MAX_ACTION
+	bne loop
+	
+	rts
+	.ctxend
+
 irq1:	.(
 	lda $fc
         pha
@@ -227,15 +584,15 @@ irq1:	.(
         jmp (oldirq1v)
 
 timer1
+	.(
 	; Clear interrupt
 	lda USR_T1C_L
 
 	phx
 	phy
 
-	.(
 	lda first_after_vsync
-	beq disable_irq
+	beq do_actions
 	
 	; First IRQ in the new CRTC cycle: set some registers
 	; CRTC cycle length = 16 rows
@@ -254,7 +611,38 @@ timer1
 
 	stz first_after_vsync
 
-	bra not_last
+	bra next_action_setup
+
+do_actions
+	ldy action_num
+	@next_action
+	lda action_types,y
+	cmp #SECOND_CYCLE_SETUP
+	beq disable_irq
+	cmp #INSIDE_BOXES
+	beq inside_boxes
+	lda #0b00000111 ^ 1 : sta PALCONTROL
+	lda #0b00010111 ^ 1 : sta PALCONTROL
+	lda #0b00100111 ^ 1 : sta PALCONTROL
+	lda #0b00110111 ^ 1 : sta PALCONTROL
+	lda #0b01000111 ^ 1 : sta PALCONTROL
+	lda #0b01010111 ^ 1 : sta PALCONTROL
+	lda #0b01100111 ^ 1 : sta PALCONTROL
+	lda #0b01110111 ^ 1 : sta PALCONTROL
+	bra next_action_setup
+inside_boxes
+	lda #0b00000111 ^ 3 : sta PALCONTROL
+	lda #0b00010111 ^ 3 : sta PALCONTROL
+	lda #0b00100111 ^ 3 : sta PALCONTROL
+	lda #0b00110111 ^ 3 : sta PALCONTROL
+	lda #0b01000111 ^ 1 : sta PALCONTROL
+	lda #0b01010111 ^ 1 : sta PALCONTROL
+	lda #0b01100111 ^ 1 : sta PALCONTROL
+	lda #0b01110111 ^ 1 : sta PALCONTROL
+
+next_action_setup
+	@latch_action
+	bra exit_timer1
 
 disable_irq
 	; Disable usr timer1 interrupt
@@ -268,14 +656,14 @@ disable_irq
 	@crtc_write 4, {#total_lines-top_screen_lines-2}
 	@crtc_write 6, {#displayed_lines-top_screen_lines}
 	@crtc_write 7, {#total_lines-top_screen_lines-5}
-not_last
-	.)
 
+exit_timer1:
 	ply
 	plx
 	pla
 	sta $fc
 	rti
+	.)
 
 new_cycle_time
 	.word 64 * 40
@@ -287,6 +675,7 @@ first_after_vsync
 	.alias tmp2 $82
 
 vsync
+	.(
 	phx
 	phy
 
@@ -299,12 +688,17 @@ vsync
         lda new_cycle_time+1
         sta USR_T1C_H
 
-	; Latch the time for the subsequent flip -- for the secondary CRTC
-	; cycle.
-	lda #<[64*8*top_screen_lines-2]
-	sta USR_T1L_L
-	lda #>[64*8*top_screen_lines-2]
-	sta USR_T1L_H
+	lda #0
+	sta action_num
+
+	; Latch the time for the subsequent flip -- the first action.
+	@latch_action
+	@next_action
+
+	;lda #<[64*8*top_screen_lines-2]
+	;sta USR_T1L_L
+	;lda #>[64*8*top_screen_lines-2]
+	;sta USR_T1L_H
 
 	; Clear IFR
 	lda SYS_ORA
@@ -381,4 +775,5 @@ vsync
 	sta $fc
 	rti
 	;jmp (oldirq1v)
+	.)
 	.)
