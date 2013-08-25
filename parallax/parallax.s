@@ -10,12 +10,13 @@
 	; handling IRQ contexts properly.)
 	.alias tmp $80
 	.alias tmp2 $82
+	.alias pal_ptr $84
+	.alias offset $86
 	
 start:
 	lda #2
 	jsr mos_setmode
 	jsr stripes
-	jsr blocks
 	jsr action_diffs
 	jsr initvsync
 	
@@ -48,7 +49,7 @@ s3:	lda #3
 do_lscroll
 	sta %scroll_left.amount
 	jsr scroll_left
-	;jsr set_hwscroll
+	;jsr horiz_scroll_bg_layer
 	bra scroll_loop
 
 l1:	lda #1
@@ -59,7 +60,7 @@ l3:	lda #3
 do_rscroll:
 	sta %scroll_right.amount
 	jsr scroll_right
-	;jsr set_hwscroll
+	;jsr horiz_scroll_bg_layer
 
 	bra scroll_loop
 	
@@ -108,7 +109,7 @@ nohi:	.)
 	.(
 	inc %stripecol
 	lda %stripecol
-	cmp #12
+	cmp #15
 	bne skip
 	stz %stripecol
 skip:	.)
@@ -130,18 +131,21 @@ skip:	.)
 	.ctxend
 	
 stripecolour
-	.byte [0b0000000 << 1] | 0b0000000
 	.byte [0b0000000 << 1] | 0b0000001
-	.byte [0b0000001 << 1] | 0b0000001
-	.byte [0b0000100 << 1] | 0b0000100
 	.byte [0b0000100 << 1] | 0b0000101
-	.byte [0b0000101 << 1] | 0b0000101
-	.byte [0b0010000 << 1] | 0b0010000
 	.byte [0b0010000 << 1] | 0b0010001
-	.byte [0b0010001 << 1] | 0b0010001
-	.byte [0b0010100 << 1] | 0b0010100
 	.byte [0b0010100 << 1] | 0b0010101
-	.byte [0b0010101 << 1] | 0b0010101
+	.byte [0b1000000 << 1] | 0b1000001
+	.byte [0b1000100 << 1] | 0b1000101
+	.byte [0b1010000 << 1] | 0b1010001
+	.byte [0b1010100 << 1] | 0b0000000
+	.byte [0b0000001 << 1] | 0b0000100
+	.byte [0b0000101 << 1] | 0b0010000
+	.byte [0b0010001 << 1] | 0b0010100
+	.byte [0b0010101 << 1] | 0b1000000
+	.byte [0b1000001 << 1] | 0b1000100
+	.byte [0b1000101 << 1] | 0b1010000
+	.byte [0b1010001 << 1] | 0b1010100
 
 	.context draw_column
 	; args -- column_top is clobbered.
@@ -166,7 +170,7 @@ loop
 	and #8
 	beq stripes
 solid
-	lda #[0b1000000 << 1] | 0b1000000
+	lda #[0b1010101 << 1] | 0b1010101
 	bra block
 stripes
 	lda %stripecol
@@ -213,23 +217,20 @@ nowrap:	.)
 	sta CRTC_DATA
 	.mend
 	
-	.context blocks
-blocks:
-	rts
-	.ctxend
-
 start_addr
 	.word $3000
 	; These are the "next" columns to draw on the lhs/rhs, i.e. after
 	; scrolling one column.
 lhs_col
-	.byte 11
+	.byte 14
 rhs_col
-	.byte 8
+	.byte 5
 lhs_blk
 	.byte 95
 rhs_blk
 	.byte 16
+bglayer_offset
+	.byte 0
 
 	; Scroll screen contents to the left by AMOUNT, filling in columns on
 	; the right-hand side.
@@ -238,9 +239,11 @@ rhs_blk
 	.var amount
 	; temps
 	.var2 tmp, rhs_col_addr
+	.var tmp2, amount_copy
 
 scroll_left:
 	lda %amount
+	sta %amount_copy
 	; Set %tmp to amount * 8.
 	stz %tmp+1
 	asl a
@@ -250,7 +253,7 @@ scroll_left:
 	asl a
 	rol %tmp+1
 	sta %tmp
-	
+		
 	; The first column to fill is start_addr + 640. Set
 	; %rhs_col_addr to this.
 	lda start_addr
@@ -300,7 +303,7 @@ nowrap:	.)
 	.(
 	inc lhs_col
 	lda lhs_col
-	cmp #12
+	cmp #15
 	bne skip
 	stz lhs_col
 skip:	.)
@@ -308,7 +311,7 @@ skip:	.)
 	.(
 	inc rhs_col
 	lda rhs_col
-	cmp #12
+	cmp #15
 	bne skip
 	stz rhs_col
 skip:	.)
@@ -347,6 +350,19 @@ skip:	.)
 nowrap:	.)
 	sta start_addr+1
 
+	.(
+	lda bglayer_offset
+	sec
+	sbc %amount_copy
+retry:
+	cmp #15
+	bcc skip
+	clc
+	adc #15
+	bra retry
+skip:	.)
+	sta bglayer_offset
+
 	rts
 	.ctxend
 
@@ -355,9 +371,11 @@ nowrap:	.)
 	.var amount
 	; temps
 	.var2 tmp, lhs_col_addr
+	.var amount_copy
 
 scroll_right:
 	lda %amount
+	sta %amount_copy
 	stz %tmp+1
 	asl a
 	rol %tmp+1
@@ -416,7 +434,7 @@ nowrap:	.)
 	lda lhs_col
 	cmp #$ff
 	bne skip
-	lda #11
+	lda #14
 	sta lhs_col
 skip:	.)
 
@@ -425,7 +443,7 @@ skip:	.)
 	lda rhs_col
 	cmp #$ff
 	bne skip
-	lda #11
+	lda #14
 	sta rhs_col
 skip:	.)
 
@@ -465,8 +483,65 @@ skip:	.)
 nowrap:	.)
 	sta start_addr+1
 	
+	.(
+	lda bglayer_offset
+	clc
+	adc %amount_copy
+retry:
+	cmp #15
+	bcc skip
+	sec
+	sbc #15
+	bra retry
+skip:	.)
+	sta bglayer_offset
+	
+	
 	rts
 	.ctxend
+
+	; Update palette for BG layer by modifying code. Set to
+	; "bglayer_offset".
+
+horiz_scroll_bg_layer
+	.(
+	lda #<[inside_boxes+1]
+	sta pal_ptr
+	lda #>[inside_boxes+1]
+	sta pal_ptr+1
+	lda bglayer_offset
+	sta offset
+	ldy #0
+loop
+	lda offset
+	cmp #8
+	bcs outside
+	lda (pal_ptr),y
+	and #0b11111100
+	sta (pal_ptr),y
+	bra done
+outside
+	lda (pal_ptr),y
+	ora #0b00000010
+	sta (pal_ptr),y
+done
+	tya
+	clc
+	adc #5
+	tay
+	
+	.(
+	inc offset
+	lda offset
+	cmp #15
+	bcc skip
+	stz offset
+skip:	.)
+	
+	cpy #75
+	bcc loop
+	rts
+	.)
 
 	; Called from IRQ, can't be context! Be careful with 'tmp' usage.
 set_hwscroll:
@@ -564,20 +639,26 @@ oldirq1v
 action_num
 	.byte 0
 
-	.alias MAX_ACTION 10
+	.alias MAX_ACTION 16
 
 	; These are preprocessed by action_diffs.
 action_times
 	.word 0
-	.word 64*24-2
-	.word 64*24*2-2
-	.word 64*24*3-2
-	.word 64*24*4-2
-	.word 64*24*5-2
-	.word 64*24*6-2
-	.word 64*24*7-2
-	.word 64*24*8-2
-	.word 64*24*9-2
+	.word 64*15-2
+	.word 64*15*2-2
+	.word 64*15*3-2
+	.word 64*15*4-2
+	.word 64*15*5-2
+	.word 64*15*6-2
+	.word 64*15*7-2
+	.word 64*15*8-2
+	.word 64*15*9-2
+	.word 64*15*10-2
+	.word 64*15*11-2
+	.word 64*15*12-2
+	.word 64*15*13-2
+	.word 64*15*14-2
+	.word 64*15*15-2
 	.word 64*8*top_screen_lines-2
 last_action
 
@@ -586,6 +667,12 @@ action_time_diffs
 
 action_types
 	.byte FIRST_CYCLE_SETUP
+	.byte INSIDE_BOXES
+	.byte OUTSIDE_BOXES
+	.byte INSIDE_BOXES
+	.byte OUTSIDE_BOXES
+	.byte INSIDE_BOXES
+	.byte OUTSIDE_BOXES
 	.byte INSIDE_BOXES
 	.byte OUTSIDE_BOXES
 	.byte INSIDE_BOXES
@@ -638,7 +725,7 @@ loop
 	rts
 	.ctxend
 
-irq1:	.(
+irq1:
 	lda $fc
         pha
 
@@ -656,7 +743,6 @@ irq1:	.(
         jmp (oldirq1v)
 
 timer1
-	.(
 	; Clear interrupt
 	lda USR_T1C_L
 
@@ -701,16 +787,34 @@ do_actions
 	lda #0b01010111 ^ 1 : sta PALCONTROL
 	lda #0b01100111 ^ 1 : sta PALCONTROL
 	lda #0b01110111 ^ 1 : sta PALCONTROL
+	lda #0b10000111 ^ 1 : sta PALCONTROL
+	lda #0b10010111 ^ 1 : sta PALCONTROL
+	lda #0b10100111 ^ 1 : sta PALCONTROL
+	lda #0b10110111 ^ 1 : sta PALCONTROL
+	lda #0b11000111 ^ 1 : sta PALCONTROL
+	lda #0b11010111 ^ 1 : sta PALCONTROL
+	lda #0b11100111 ^ 1 : sta PALCONTROL
+	lda #0b11110111 ^ 0 : sta PALCONTROL
 	bra next_action_setup
+	; WARNING: This label is used as an anchor to directly modify the
+	; immediates in the subsequent code.
 inside_boxes
 	lda #0b00000111 ^ 3 : sta PALCONTROL
 	lda #0b00010111 ^ 3 : sta PALCONTROL
 	lda #0b00100111 ^ 3 : sta PALCONTROL
 	lda #0b00110111 ^ 3 : sta PALCONTROL
-	lda #0b01000111 ^ 1 : sta PALCONTROL
-	lda #0b01010111 ^ 1 : sta PALCONTROL
-	lda #0b01100111 ^ 1 : sta PALCONTROL
-	lda #0b01110111 ^ 1 : sta PALCONTROL
+	lda #0b01000111 ^ 3 : sta PALCONTROL
+	lda #0b01010111 ^ 3 : sta PALCONTROL
+	lda #0b01100111 ^ 3 : sta PALCONTROL
+	lda #0b01110111 ^ 3 : sta PALCONTROL
+	lda #0b10000111 ^ 1 : sta PALCONTROL
+	lda #0b10010111 ^ 1 : sta PALCONTROL
+	lda #0b10100111 ^ 1 : sta PALCONTROL
+	lda #0b10110111 ^ 1 : sta PALCONTROL
+	lda #0b11000111 ^ 1 : sta PALCONTROL
+	lda #0b11010111 ^ 1 : sta PALCONTROL
+	lda #0b11100111 ^ 1 : sta PALCONTROL
+	lda #0b11110111 ^ 0 : sta PALCONTROL
 
 next_action_setup
 	@latch_action
@@ -735,7 +839,6 @@ exit_timer1:
 	pla
 	sta $fc
 	rti
-	.)
 
 new_cycle_time
 	.word 64 * 40
@@ -744,7 +847,6 @@ first_after_vsync
 	.byte 0
 
 vsync
-	.(
 	phx
 	phy
 
@@ -830,6 +932,7 @@ vsync
 	;adc tmp+1
 	;sta CRTC_DATA
 	
+	jsr horiz_scroll_bg_layer
 	jsr set_hwscroll
 	
 	lda #5
@@ -846,5 +949,3 @@ vsync
 	sta $fc
 	rti
 	;jmp (oldirq1v)
-	.)
-	.)
