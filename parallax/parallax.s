@@ -14,6 +14,7 @@
 	.alias tmp4 $86
 	.alias pal_ptr $88
 	.alias offset $8a
+	.alias top_small_box_colour $8b
 	
 start:
 	lda #2
@@ -703,7 +704,6 @@ action_num
 	; These are preprocessed by action_diffs.
 action_times
 	.word 0
-	.word 64*2-2
 	.word 64*16-2
 	.word 64*16*2-2
 	.word 64*16*3-2
@@ -718,10 +718,11 @@ action_times
 	.word 64*16*12-2
 	.word 64*16*13-2
 	.word 64*16*14-2
-	.word 64*16*15-2
-	.word 64*16*16-2
-	.word 64*8*[top_screen_lines-2]-2
+	.word 64*8*[top_screen_lines-1]-2
 	.word 64*8*top_screen_lines-2
+	.word 0
+	.word 0
+	.word 0
 	.word 0
 	.word 0
 	.word 0
@@ -736,6 +737,7 @@ action_time_diffs
 	.dsb NUM_ACTIONS*2,0
 
 action_types
+	.byte -1
 	.byte FIRST_CYCLE_SETUP
 	.byte INSIDE_BOXES
 	.byte OUTSIDE_BOXES
@@ -753,6 +755,8 @@ action_types
 	.byte OUTSIDE_BOXES
 	.byte DISABLE_VIDEO
 	.byte SECOND_CYCLE_SETUP
+	.byte 0
+	.byte 0
 	.byte 0
 	.byte 0
 	.byte 0
@@ -792,7 +796,7 @@ loop
 	iny
 	inc tmp
 	lda tmp
-	cmp #NUM_ACTIONS
+	cmp #NUM_ACTIONS-1
 	bne loop
 	
 	rts
@@ -800,11 +804,6 @@ loop
 
 flips_from_v_offset
 	.(
-	lda #<[64*4]
-	sta tmp
-	lda #>[64*4]
-	sta tmp+1
-
 	lda #<[action_times+2]
 	sta tmp2
 	lda #>[action_times+2]
@@ -825,15 +824,17 @@ flips_from_v_offset
 
 	lda tmp4
 	clc
-	adc tmp
+	adc #<[64*4]
 	sta tmp4
 	lda tmp4+1
-	adc tmp+1
+	adc #>[64*4]
 	sta tmp4+1
 
 	lda tmp3
 	and #16
 	sta tmp3
+	
+	sta top_small_box_colour
 
 	ldy #0
 	ldx #0
@@ -861,7 +862,7 @@ fill:
 	lda final_action+1
 	sta (tmp2),y
 	lda #DISABLE_VIDEO
-	sta action_types+1,x
+	sta action_types+2,x
 	iny
 	lda final_action+2
 	sta (tmp2),y
@@ -869,7 +870,7 @@ fill:
 	lda final_action+3
 	sta (tmp2),y
 	lda #SECOND_CYCLE_SETUP
-	sta action_types+2,x
+	sta action_types+3,x
 	bra exit
 ok:	.)
 
@@ -888,7 +889,7 @@ ok:	.)
 obox
 	lda #OUTSIDE_BOXES
 store
-	sta action_types+1,x
+	sta action_types+2,x
 	
 	lda tmp3
 	eor #16
@@ -929,7 +930,6 @@ timer1
 	phy
 
 	ldy action_num
-	@next_action
 	lda action_types,y
 	asl a
 	tax
@@ -946,10 +946,11 @@ action_tab
 first_after_vsync	
 	; First IRQ in the new CRTC cycle: set some registers
 	; CRTC cycle length = 16 rows
+	; Enable video
+	@crtc_write 8, {#0b11000001}
 	@crtc_write 4, {#top_screen_lines-1}
 	@crtc_write 6, {#top_screen_lines}
 	@crtc_write 7, {#255}
-	@crtc_write 8, {#0b11000001}
 	lda #5
 	sta CRTC_ADDR
 	lda v_offset
@@ -960,7 +961,10 @@ first_after_vsync
 	@crtc_write 12, {#>[$3000/8]}
 	@crtc_write 13, {#<[$3000/8]}
 
-	bra next_action_setup
+	; At the top of the screen, we're either inside a small box or not.
+	; set the palette right away.
+	lda top_small_box_colour
+	beq inside_boxes
 
 outside_boxes
 	lda #0b00000111 ^ 1 : sta PALCONTROL
@@ -1011,6 +1015,7 @@ enable_video
 
 next_action_setup
 	@latch_action
+	@next_action
 	bra exit_timer1
 
 disable_irq
@@ -1022,6 +1027,7 @@ disable_irq
 	sta USR_T1L_H
 	
 	; remaining rows
+	; enable video
 	@crtc_write 8, {#0b11000001}
 	@crtc_write 4, {#total_lines-top_screen_lines-2}
 	@crtc_write 6, {#displayed_lines-top_screen_lines}
@@ -1058,6 +1064,7 @@ vsync
 
 	; Latch the time for the subsequent flip -- the first action.
 	@latch_action
+	@next_action
 
 	;lda #<[64*8*top_screen_lines-2]
 	;sta USR_T1L_L
@@ -1077,7 +1084,7 @@ vsync
 	lda #0b11000000
 	sta USR_IER
 
-	;inc v_offset
+	inc v_offset
 	
 	jsr horiz_scroll_bg_layer
 	jsr set_hwscroll
