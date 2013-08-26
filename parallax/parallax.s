@@ -691,16 +691,19 @@ oldirq1v
 	.alias SECOND_CYCLE_SETUP 0
 	.alias INSIDE_BOXES 1
 	.alias OUTSIDE_BOXES 2
-	.alias FIRST_CYCLE_SETUP 3
+	.alias DISABLE_VIDEO 3
+	.alias ENABLE_VIDEO 4
+	.alias FIRST_CYCLE_SETUP 5
 
 action_num
 	.byte 0
 
-	.alias MAX_ACTION 16
+	.alias NUM_ACTIONS 24
 
 	; These are preprocessed by action_diffs.
 action_times
 	.word 0
+	.word 64*2-2
 	.word 64*16-2
 	.word 64*16*2-2
 	.word 64*16*3-2
@@ -716,12 +719,21 @@ action_times
 	.word 64*16*13-2
 	.word 64*16*14-2
 	.word 64*16*15-2
+	.word 64*16*16-2
+	.word 64*8*[top_screen_lines-2]-2
+	.word 64*8*top_screen_lines-2
+	.word 0
+	.word 0
+	.word 0
+	.word 0
+
 final_action
+	.word 64*8*[top_screen_lines-2]-2
 	.word 64*8*top_screen_lines-2
 last_action
 
 action_time_diffs
-	.dsb [MAX_ACTION+1]*2,0
+	.dsb NUM_ACTIONS*2,0
 
 action_types
 	.byte FIRST_CYCLE_SETUP
@@ -739,8 +751,12 @@ action_types
 	.byte OUTSIDE_BOXES
 	.byte INSIDE_BOXES
 	.byte OUTSIDE_BOXES
-	.byte INSIDE_BOXES
+	.byte DISABLE_VIDEO
 	.byte SECOND_CYCLE_SETUP
+	.byte 0
+	.byte 0
+	.byte 0
+	.byte 0
 
 	.macro latch_action
 	lda action_num
@@ -776,7 +792,7 @@ loop
 	iny
 	inc tmp
 	lda tmp
-	cmp #MAX_ACTION
+	cmp #NUM_ACTIONS
 	bne loop
 	
 	rts
@@ -784,9 +800,9 @@ loop
 
 flips_from_v_offset
 	.(
-	lda #<[64*1-2]
+	lda #<[64*4]
 	sta tmp
-	lda #>[64*1-2]
+	lda #>[64*4]
 	sta tmp+1
 
 	lda #<[action_times+2]
@@ -827,7 +843,36 @@ fill:
 	iny
 	lda tmp4+1
 	sta (tmp2),y
+		
+	lda tmp4
+	clc
+	adc #<[64*4]
+	sta tmp
+	lda tmp4+1
+	adc #>[64*4]
+	sta tmp+1
 	
+	.(
+	@if_ltu_abs tmp, final_action, ok
+	dey
+	lda final_action
+	sta (tmp2),y
+	iny
+	lda final_action+1
+	sta (tmp2),y
+	lda #DISABLE_VIDEO
+	sta action_types+1,x
+	iny
+	lda final_action+2
+	sta (tmp2),y
+	iny
+	lda final_action+3
+	sta (tmp2),y
+	lda #SECOND_CYCLE_SETUP
+	sta action_types+2,x
+	bra exit
+ok:	.)
+
 	lda tmp4
 	clc
 	adc #<[64*16]
@@ -835,27 +880,6 @@ fill:
 	lda tmp4+1
 	adc #>[64*16]
 	sta tmp4+1
-	
-	lda tmp4
-	clc
-	adc #<64
-	sta tmp
-	lda tmp4+1
-	adc #>64
-	sta tmp+1
-	
-	.(
-	@if_leu_abs tmp, final_action, ok
-	dey
-	lda final_action
-	sta (tmp2),y
-	iny
-	lda final_action+1
-	sta (tmp2),y
-	lda #SECOND_CYCLE_SETUP
-	sta action_types+1,x
-	bra exit
-ok:	.)
 	
 	lda tmp3
 	beq obox
@@ -873,7 +897,7 @@ store
 	inx
 	
 	iny
-	cpy #30
+	cpy #32
 	bne fill
 
 exit
@@ -904,14 +928,28 @@ timer1
 	phx
 	phy
 
-	lda first_after_vsync
-	beq do_actions
+	ldy action_num
+	@next_action
+	lda action_types,y
+	asl a
+	tax
+	jmp (action_tab,x)
+
+action_tab
+	.word disable_irq
+	.word inside_boxes
+	.word outside_boxes
+	.word disable_video
+	.word enable_video
+	.word first_after_vsync
 	
+first_after_vsync	
 	; First IRQ in the new CRTC cycle: set some registers
 	; CRTC cycle length = 16 rows
 	@crtc_write 4, {#top_screen_lines-1}
 	@crtc_write 6, {#top_screen_lines}
 	@crtc_write 7, {#255}
+	@crtc_write 8, {#0b11000001}
 	lda #5
 	sta CRTC_ADDR
 	lda v_offset
@@ -922,18 +960,9 @@ timer1
 	@crtc_write 12, {#>[$3000/8]}
 	@crtc_write 13, {#<[$3000/8]}
 
-	stz first_after_vsync
-
 	bra next_action_setup
 
-do_actions
-	ldy action_num
-	@next_action
-	lda action_types,y
-	cmp #SECOND_CYCLE_SETUP
-	beq disable_irq
-	cmp #INSIDE_BOXES
-	beq inside_boxes
+outside_boxes
 	lda #0b00000111 ^ 1 : sta PALCONTROL
 	lda #0b00010111 ^ 1 : sta PALCONTROL
 	lda #0b00100111 ^ 1 : sta PALCONTROL
@@ -951,6 +980,7 @@ do_actions
 	lda #0b11100111 ^ 1 : sta PALCONTROL
 	lda #0b11110111 ^ 0 : sta PALCONTROL
 	bra next_action_setup
+
 	; WARNING: This label is used as an anchor to directly modify the
 	; immediates in the subsequent code.
 inside_boxes
@@ -970,6 +1000,14 @@ inside_boxes
 	lda #0b11010111 ^ 1 : sta PALCONTROL
 	lda #0b11100111 ^ 1 : sta PALCONTROL
 	lda #0b11110111 ^ 0 : sta PALCONTROL
+	bra next_action_setup
+
+disable_video
+	@crtc_write 8, {#0b11110001}
+	bra next_action_setup
+
+enable_video
+	@crtc_write 8, {#0b11000001}
 
 next_action_setup
 	@latch_action
@@ -984,6 +1022,7 @@ disable_irq
 	sta USR_T1L_H
 	
 	; remaining rows
+	@crtc_write 8, {#0b11000001}
 	@crtc_write 4, {#total_lines-top_screen_lines-2}
 	@crtc_write 6, {#displayed_lines-top_screen_lines}
 	@crtc_write 7, {#total_lines-top_screen_lines-5}
@@ -997,9 +1036,6 @@ exit_timer1:
 
 new_cycle_time
 	.word 64 * 40
-
-first_after_vsync
-	.byte 0
 
 vsync
 	phx
@@ -1022,7 +1058,6 @@ vsync
 
 	; Latch the time for the subsequent flip -- the first action.
 	@latch_action
-	@next_action
 
 	;lda #<[64*8*top_screen_lines-2]
 	;sta USR_T1L_L
@@ -1042,10 +1077,7 @@ vsync
 	lda #0b11000000
 	sta USR_IER
 
-	lda #1
-	sta first_after_vsync
-
-	inc v_offset
+	;inc v_offset
 	
 	jsr horiz_scroll_bg_layer
 	jsr set_hwscroll
@@ -1056,6 +1088,9 @@ vsync
 	and #7
 	eor #7
 	sta CRTC_DATA
+
+	; Disable video
+	@crtc_write 8, {#0b11110001}
 
 	; gtfo
 	ply
