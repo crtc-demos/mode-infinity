@@ -11,8 +11,9 @@
 	.alias tmp $80
 	.alias tmp2 $82
 	.alias tmp3 $84
-	.alias pal_ptr $86
-	.alias offset $88
+	.alias tmp4 $86
+	.alias pal_ptr $88
+	.alias offset $8a
 	
 start:
 	lda #2
@@ -41,6 +42,10 @@ scroll_loop
 	beq l2
 	cpx #'9'
 	beq l3
+	cpx #'U'
+	beq go_up
+	cpx #'D'
+	beq go_down
 	bra scroll_loop
 s1:	lda #1
 	bra do_lscroll
@@ -64,7 +69,15 @@ do_rscroll:
 	;jsr horiz_scroll_bg_layer
 
 	bra scroll_loop
-	
+
+go_up
+	inc v_offset
+	bra scroll_loop
+
+go_down
+	dec v_offset
+	bra scroll_loop
+
 spin
 	;jmp spin
 	rts
@@ -688,21 +701,22 @@ action_num
 	; These are preprocessed by action_diffs.
 action_times
 	.word 0
-	.word 64*15-2
-	.word 64*15*2-2
-	.word 64*15*3-2
-	.word 64*15*4-2
-	.word 64*15*5-2
-	.word 64*15*6-2
-	.word 64*15*7-2
-	.word 64*15*8-2
-	.word 64*15*9-2
-	.word 64*15*10-2
-	.word 64*15*11-2
-	.word 64*15*12-2
-	.word 64*15*13-2
-	.word 64*15*14-2
-	.word 64*15*15-2
+	.word 64*16-2
+	.word 64*16*2-2
+	.word 64*16*3-2
+	.word 64*16*4-2
+	.word 64*16*5-2
+	.word 64*16*6-2
+	.word 64*16*7-2
+	.word 64*16*8-2
+	.word 64*16*9-2
+	.word 64*16*10-2
+	.word 64*16*11-2
+	.word 64*16*12-2
+	.word 64*16*13-2
+	.word 64*16*14-2
+	.word 64*16*15-2
+final_action
 	.word 64*8*top_screen_lines-2
 last_action
 
@@ -743,11 +757,10 @@ action_types
 	inc action_num
 	.mend
 
-	.context action_diffs
-	.var ctr
 action_diffs
+	.(
 	ldx #0
-	stx %ctr
+	stx tmp
 	ldy #2
 loop
 	lda action_times,y
@@ -761,13 +774,111 @@ loop
 	sta action_time_diffs,x
 	inx
 	iny
-	inc %ctr
-	lda %ctr
+	inc tmp
+	lda tmp
 	cmp #MAX_ACTION
 	bne loop
 	
 	rts
-	.ctxend
+	.)
+
+flips_from_v_offset
+	.(
+	lda #<[64*1-2]
+	sta tmp
+	lda #>[64*1-2]
+	sta tmp+1
+
+	lda #<[action_times+2]
+	sta tmp2
+	lda #>[action_times+2]
+	sta tmp2+1
+	
+	lda v_offset
+	eor #$ff
+	lsr a
+	sta tmp3
+	
+	and #15
+	stz tmp4
+	lsr a
+	ror tmp4
+	lsr a
+	ror tmp4
+	sta tmp4+1
+
+	lda tmp4
+	clc
+	adc tmp
+	sta tmp4
+	lda tmp4+1
+	adc tmp+1
+	sta tmp4+1
+
+	lda tmp3
+	and #16
+	sta tmp3
+
+	ldy #0
+	ldx #0
+fill:
+	lda tmp4
+	sta (tmp2),y
+	iny
+	lda tmp4+1
+	sta (tmp2),y
+	
+	lda tmp4
+	clc
+	adc #<[64*16]
+	sta tmp4
+	lda tmp4+1
+	adc #>[64*16]
+	sta tmp4+1
+	
+	lda tmp4
+	clc
+	adc #<64
+	sta tmp
+	lda tmp4+1
+	adc #>64
+	sta tmp+1
+	
+	.(
+	@if_leu_abs tmp, final_action, ok
+	dey
+	lda final_action
+	sta (tmp2),y
+	iny
+	lda final_action+1
+	sta (tmp2),y
+	lda #SECOND_CYCLE_SETUP
+	sta action_types+1,x
+	bra exit
+ok:	.)
+	
+	lda tmp3
+	beq obox
+	lda #INSIDE_BOXES
+	bra store
+obox
+	lda #OUTSIDE_BOXES
+store
+	sta action_types+1,x
+	
+	lda tmp3
+	eor #16
+	sta tmp3
+	
+	inx
+	
+	iny
+	cpy #30
+	bne fill
+
+exit
+	rts
+	.)
 
 irq1:
 	lda $fc
@@ -906,6 +1017,9 @@ vsync
 	lda #0
 	sta action_num
 
+	jsr flips_from_v_offset
+	jsr action_diffs
+
 	; Latch the time for the subsequent flip -- the first action.
 	@latch_action
 	@next_action
@@ -932,23 +1046,6 @@ vsync
 	sta first_after_vsync
 
 	inc v_offset
-
-	;@crtc_write 12, {#>[$3000/8]}
-	;@crtc_write 13, {#<[$3000/8]}
-	
-	
-	;lda #13
-	;sta CRTC_ADDR
-	;lda #<[$3000/8]
-	;clc
-	;adc tmp
-	;sta CRTC_DATA
-	
-	;lda #12
-	;sta CRTC_ADDR
-	;lda #>[$3000/8]
-	;adc tmp+1
-	;sta CRTC_DATA
 	
 	jsr horiz_scroll_bg_layer
 	jsr set_hwscroll
