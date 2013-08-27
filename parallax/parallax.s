@@ -729,8 +729,8 @@ action_times
 	.word 0
 
 final_action
-	.word 64*8*[top_screen_lines-2]-2
-	.word 64*8*top_screen_lines-2
+	.word 64*8*[top_screen_lines-1]
+	.word 64*8*top_screen_lines
 last_action
 
 action_time_diffs
@@ -767,9 +767,11 @@ action_types
 	asl a
 	tay
 	lda action_time_diffs,y
+	sec
+	sbc #2
 	sta USR_T1L_L
-	iny
-	lda action_time_diffs,y
+	lda action_time_diffs+1,y
+	sbc #0
 	sta USR_T1L_H
 	.mend
 	
@@ -781,19 +783,25 @@ action_diffs
 	.(
 	ldx #0
 	stx tmp
-	ldy #2
 loop
-	lda action_times,y
+	lda action_times+2,x
 	sec
 	sbc action_times,x
 	sta action_time_diffs,x
-	inx
-	iny
-	lda action_times,y
-	sbc action_times,x
-	sta action_time_diffs,x
-	inx
-	iny
+	lda action_times+3,x
+	sbc action_times+1,x
+	sta action_time_diffs+1,x
+	
+	;lda action_time_diffs,x
+	;sec
+	;sbc #2
+	;sta action_time_diffs,x
+	;lda action_time_diffs+1,x
+	;sbc #0
+	;sta action_time_diffs+1,x
+	
+	inx : inx
+
 	inc tmp
 	lda tmp
 	cmp #NUM_ACTIONS-1
@@ -947,7 +955,7 @@ first_after_vsync
 	; First IRQ in the new CRTC cycle: set some registers
 	; CRTC cycle length = 16 rows
 	; Enable video
-	@crtc_write 8, {#0b11000001}
+	@crtc_write 8, {#0b11000000}
 	@crtc_write 4, {#top_screen_lines-1}
 	@crtc_write 6, {#top_screen_lines}
 	@crtc_write 7, {#255}
@@ -1007,11 +1015,11 @@ inside_boxes
 	bra next_action_setup
 
 disable_video
-	@crtc_write 8, {#0b11110001}
+	@crtc_write 8, {#0b11110000}
 	bra next_action_setup
 
 enable_video
-	@crtc_write 8, {#0b11000001}
+	@crtc_write 8, {#0b11000000}
 
 next_action_setup
 	@latch_action
@@ -1028,7 +1036,7 @@ disable_irq
 	
 	; remaining rows
 	; enable video
-	@crtc_write 8, {#0b11000001}
+	@crtc_write 8, {#0b11000000}
 	@crtc_write 4, {#total_lines-top_screen_lines-2}
 	@crtc_write 6, {#displayed_lines-top_screen_lines}
 	@crtc_write 7, {#total_lines-top_screen_lines-5}
@@ -1097,7 +1105,7 @@ vsync
 	sta CRTC_DATA
 
 	; Disable video
-	@crtc_write 8, {#0b11110001}
+	@crtc_write 8, {#0b11110000}
 
 	; gtfo
 	ply
