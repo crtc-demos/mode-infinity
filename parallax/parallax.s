@@ -718,8 +718,8 @@ action_times
 	.word 64*16*12-2
 	.word 64*16*13-2
 	.word 64*16*14-2
-	.word 64*8*[top_screen_lines-1]-2
 	.word 64*8*top_screen_lines-2
+	.word 0
 	.word 0
 	.word 0
 	.word 0
@@ -730,7 +730,6 @@ action_times
 
 final_action
 	.word 64*8*[top_screen_lines-1]
-	.word 64*8*top_screen_lines
 last_action
 
 action_time_diffs
@@ -753,8 +752,8 @@ action_types
 	.byte OUTSIDE_BOXES
 	.byte INSIDE_BOXES
 	.byte OUTSIDE_BOXES
-	.byte DISABLE_VIDEO
 	.byte SECOND_CYCLE_SETUP
+	.byte 0
 	.byte 0
 	.byte 0
 	.byte 0
@@ -869,16 +868,8 @@ fill:
 	iny
 	lda final_action+1
 	sta (tmp2),y
-	lda #DISABLE_VIDEO
-	sta action_types+2,x
-	iny
-	lda final_action+2
-	sta (tmp2),y
-	iny
-	lda final_action+3
-	sta (tmp2),y
 	lda #SECOND_CYCLE_SETUP
-	sta action_types+3,x
+	sta action_types+2,x
 	bra exit
 ok:	.)
 
@@ -956,15 +947,13 @@ first_after_vsync
 	; CRTC cycle length = 16 rows
 	; Enable video
 	@crtc_write 8, {#0b11000000}
-	@crtc_write 4, {#top_screen_lines-1}
-	@crtc_write 6, {#top_screen_lines}
-	@crtc_write 7, {#255}
 	lda #5
 	sta CRTC_ADDR
 	lda v_offset
 	and #7
-	inc a
 	sta CRTC_DATA
+
+	@crtc_write 4, {#top_screen_lines-2}
 
 	@crtc_write 12, {#>[$3000/8]}
 	@crtc_write 13, {#<[$3000/8]}
@@ -1036,9 +1025,10 @@ disable_irq
 	
 	; remaining rows
 	; enable video
-	@crtc_write 8, {#0b11000000}
+	;@crtc_write 8, {#0b11000000}
 	@crtc_write 4, {#total_lines-top_screen_lines-2}
-	@crtc_write 6, {#displayed_lines-top_screen_lines}
+	;@crtc_write 6, {#displayed_lines-top_screen_lines}
+	@crtc_write 6, {#2}
 	@crtc_write 7, {#total_lines-top_screen_lines-5}
 
 exit_timer1:
@@ -1051,6 +1041,7 @@ exit_timer1:
 new_cycle_time
 	.word 64 * 40
 
+	; We control when vsync happens!
 vsync
 	phx
 	phy
@@ -1092,7 +1083,7 @@ vsync
 	lda #0b11000000
 	sta USR_IER
 
-	inc v_offset
+	;inc v_offset
 	
 	jsr horiz_scroll_bg_layer
 	jsr set_hwscroll
@@ -1102,10 +1093,13 @@ vsync
 	lda v_offset
 	and #7
 	eor #7
+	inc
 	sta CRTC_DATA
 
 	; Disable video
 	@crtc_write 8, {#0b11110000}
+	@crtc_write 6, {#top_screen_lines}
+	@crtc_write 7, {#255}
 
 	; gtfo
 	ply
