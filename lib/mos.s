@@ -36,6 +36,7 @@
 	.alias USR_IFR $fe6d
 	.alias USR_IER $fe6e
 
+	.alias ULACONTROL $fe20
 	.alias PALCONTROL $fe21
 
 	; The "notemps" directive says that these functions are safe to call

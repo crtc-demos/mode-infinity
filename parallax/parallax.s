@@ -22,7 +22,125 @@ start:
 	jsr stripes
 	jsr action_diffs
 	jsr initvsync
+
+spin
+	lda vsync_ctr
+	cmp vsync_ours
+	beq spin
+	sta vsync_ours
+
+	ldx phase+1
+	lda sintab,x
+	tay
+	txa
+	clc
+	adc #64
+	tax
+	lda sintab,x
 	
+	.(
+	bpl pos
+	ldx #255
+	stx utmp
+	bra done
+pos:	stz utmp
+done:	.)
+	
+	asl a
+	rol utmp
+	asl a
+	rol utmp
+	asl a
+	rol utmp
+	
+	clc
+	adc vpos
+	sta vpos
+	lda vpos+1
+	adc utmp
+	sta vpos+1
+	
+	lda hpos+1
+	sta old_hpos
+	
+	tya
+	.(
+	bpl pos
+	ldx #255
+	stx utmp
+	bra done
+pos:	stz utmp
+done:	.)
+	
+	asl a
+	rol utmp
+	
+	clc
+	adc hpos
+	sta hpos
+	lda hpos+1
+	adc utmp
+	sta hpos+1
+	
+	lda vpos+1
+	sta v_offset_usr
+	
+	.(
+	lda old_hpos
+	sec
+	sbc hpos+1
+	beq done
+	bmi lower
+	sta %scroll_left.amount
+	jsr scroll_left
+	bra done
+lower:
+	sta utmp
+	lda #0
+	sec
+	sbc utmp
+	sta %scroll_right.amount
+	jsr scroll_right
+done:	.)
+	
+	lda phase
+	clc
+	adc #32
+	sta phase
+	.(
+	bcc nohi
+	inc phase+1
+nohi:	.)
+
+	bra spin
+
+auto_loop
+	lda #0
+	sta anim_ctr
+loop_left
+	lda #1
+	sta %scroll_left.amount
+	jsr scroll_left
+	
+	inc anim_ctr
+	lda anim_ctr
+	cmp #255
+	bne loop_left
+	
+	lda #0
+	sta anim_ctr
+loop_right
+	lda #1
+	sta %scroll_right.amount
+	jsr scroll_right
+	
+	inc anim_ctr
+	lda anim_ctr
+	cmp #255
+	bne loop_right
+	
+	bra auto_loop
+
 scroll_loop
 	lda #129
 	ldx #<1000
@@ -79,9 +197,10 @@ go_down
 	dec v_offset
 	bra scroll_loop
 
-spin
-	;jmp spin
 	rts
+	
+anim_ctr
+	.byte 0
 	
 	.include "../lib/mos.s"
 	.include "../lib/cmp.s"
@@ -639,10 +758,18 @@ initvsync
         ;sta USR_ACR
         
         ; Sys VIA CA1 interrupt on positive edge
-        lda SYS_PCR
-        ora #$1
+	lda #4
         sta SYS_PCR
-                
+
+	; This removes jitters, but stops the keyboard from working!
+	lda #0
+	;sta SYS_ACR
+
+	;lda #15:sta SYS_DDRB
+	;lda #4:sta SYS_ORB:inc a:sta SYS_ORB
+	;lda #3:sta SYS_ORB
+	;lda #$7f:sta SYS_DDRA
+
         ; Point at IRQ handler
         lda #<irq1
         ldx #>irq1
@@ -683,6 +810,24 @@ initvsync
 
 v_offset
 	.byte 0
+v_offset_usr
+	.byte 0
+
+vpos
+	.word 0
+hpos
+	.word 0
+old_hpos
+	.byte 0
+phase
+	.word 0
+utmp
+	.byte 0
+vsync_ours
+	.byte 0
+
+sintab:
+	.include "sintab.s"
 
 old_sys_ier
 	.byte 0
@@ -695,6 +840,7 @@ oldirq1v
 	.alias DISABLE_VIDEO 3
 	.alias ENABLE_VIDEO 4
 	.alias FIRST_CYCLE_SETUP 5
+	.alias MODE_SWITCH 6
 
 action_num
 	.byte 0
@@ -718,7 +864,7 @@ action_times
 	.word 64*16*12-2
 	.word 64*16*13-2
 	.word 64*16*14-2
-	.word 64*8*top_screen_lines-2
+	.word 64*8*[top_screen_lines-1]
 	.word 0
 	.word 0
 	.word 0
@@ -729,6 +875,7 @@ action_times
 	.word 0
 
 final_action
+	.word 64*8*[top_screen_lines-1] - 64*3
 	.word 64*8*[top_screen_lines-1]
 last_action
 
@@ -868,8 +1015,18 @@ fill:
 	iny
 	lda final_action+1
 	sta (tmp2),y
-	lda #SECOND_CYCLE_SETUP
+	lda #MODE_SWITCH
 	sta action_types+2,x
+
+	iny
+	lda final_action+2
+	sta (tmp2),y
+	iny
+	lda final_action+3
+	sta (tmp2),y
+	lda #SECOND_CYCLE_SETUP
+	sta action_types+3,x
+
 	bra exit
 ok:	.)
 
@@ -941,6 +1098,7 @@ action_tab
 	.word disable_video
 	.word enable_video
 	.word first_after_vsync
+	.word mode_switch
 	
 first_after_vsync	
 	; First IRQ in the new CRTC cycle: set some registers
@@ -954,9 +1112,13 @@ first_after_vsync
 	sta CRTC_DATA
 
 	@crtc_write 4, {#top_screen_lines-2}
+	@crtc_write 6, {#top_screen_lines}
+	@crtc_write 7, {#255}
 
 	@crtc_write 12, {#>[$3000/8]}
 	@crtc_write 13, {#<[$3000/8]}
+
+	;bra next_action_setup
 
 	; At the top of the screen, we're either inside a small box or not.
 	; set the palette right away.
@@ -1003,6 +1165,12 @@ inside_boxes
 	lda #0b11110111 ^ 0 : sta PALCONTROL
 	bra next_action_setup
 
+mode_switch
+	lda #0b11111000
+	sta ULACONTROL
+
+	bra next_action_setup
+
 disable_video
 	@crtc_write 8, {#0b11110000}
 	bra next_action_setup
@@ -1019,17 +1187,33 @@ disable_irq
 	; Disable usr timer1 interrupt
 	lda #0b01000000
 	sta USR_IER
-	lda #255
-	sta USR_T1L_L
-	sta USR_T1L_H
+	;lda #255
+	;sta USR_T1C_L
+	;sta USR_T1C_H
 	
 	; remaining rows
-	; enable video
-	;@crtc_write 8, {#0b11000000}
-	@crtc_write 4, {#total_lines-top_screen_lines-2}
+	@crtc_write 4, {#total_lines-top_screen_lines-1}
 	;@crtc_write 6, {#displayed_lines-top_screen_lines}
 	@crtc_write 6, {#2}
-	@crtc_write 7, {#total_lines-top_screen_lines-5}
+	;@crtc_write 7, {#total_lines-top_screen_lines-4}
+	@crtc_write 7, {#5}
+
+	;lda #0b00000111 ^ 6 : sta PALCONTROL
+	;lda #0b00010111 ^ 6 : sta PALCONTROL
+	;lda #0b00100111 ^ 6 : sta PALCONTROL
+	;lda #0b00110111 ^ 6 : sta PALCONTROL
+	;lda #0b01000111 ^ 6 : sta PALCONTROL
+	;lda #0b01010111 ^ 6 : sta PALCONTROL
+	;lda #0b01100111 ^ 6 : sta PALCONTROL
+	;lda #0b01110111 ^ 4 : sta PALCONTROL
+	;lda #0b10000111 ^ 4 : sta PALCONTROL
+	;lda #0b10010111 ^ 4 : sta PALCONTROL
+	;lda #0b10100111 ^ 4 : sta PALCONTROL
+	;lda #0b10110111 ^ 4 : sta PALCONTROL
+	;lda #0b11000111 ^ 4 : sta PALCONTROL
+	;lda #0b11010111 ^ 4 : sta PALCONTROL
+	;lda #0b11100111 ^ 4 : sta PALCONTROL
+	;lda #0b11110111 ^ 0 : sta PALCONTROL
 
 exit_timer1:
 	ply
@@ -1039,13 +1223,13 @@ exit_timer1:
 	rti
 
 new_cycle_time
-	.word 64 * 40
+	.word 64*8*5 - 64*2 + 18
+
+vsync_ctr
+	.byte 0
 
 	; We control when vsync happens!
 vsync
-	phx
-	phy
-
 	; Clear interrupt
 	lda USR_T1C_L
 
@@ -1054,6 +1238,9 @@ vsync
         sta USR_T1C_L
         lda new_cycle_time+1
         sta USR_T1C_H
+
+	phx
+	phy
 
 	lda #0
 	sta action_num
@@ -1083,7 +1270,9 @@ vsync
 	lda #0b11000000
 	sta USR_IER
 
-	;inc v_offset
+	inc vsync_ctr
+	lda v_offset_usr
+	sta v_offset
 	
 	jsr horiz_scroll_bg_layer
 	jsr set_hwscroll
@@ -1098,8 +1287,26 @@ vsync
 
 	; Disable video
 	@crtc_write 8, {#0b11110000}
-	@crtc_write 6, {#top_screen_lines}
-	@crtc_write 7, {#255}
+
+	;lda #0b00000111 ^ 6 : sta PALCONTROL
+	;lda #0b00010111 ^ 6 : sta PALCONTROL
+	;lda #0b00100111 ^ 6 : sta PALCONTROL
+	;lda #0b00110111 ^ 6 : sta PALCONTROL
+	;lda #0b01000111 ^ 6 : sta PALCONTROL
+	;lda #0b01010111 ^ 6 : sta PALCONTROL
+	;lda #0b01100111 ^ 6 : sta PALCONTROL
+	;lda #0b01110111 ^ 4 : sta PALCONTROL
+	;lda #0b10000111 ^ 4 : sta PALCONTROL
+	;lda #0b10010111 ^ 4 : sta PALCONTROL
+	;lda #0b10100111 ^ 4 : sta PALCONTROL
+	;lda #0b10110111 ^ 4 : sta PALCONTROL
+	;lda #0b11000111 ^ 4 : sta PALCONTROL
+	;lda #0b11010111 ^ 4 : sta PALCONTROL
+	;lda #0b11100111 ^ 4 : sta PALCONTROL
+	;lda #0b11110111 ^ 0 : sta PALCONTROL
+
+	lda #0b11110100
+	sta ULACONTROL
 
 	; gtfo
 	ply
