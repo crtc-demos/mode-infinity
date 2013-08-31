@@ -1,6 +1,6 @@
 	.org $e00
 	
-	.temps $70..$8c
+	.temps $70..$7f
 	
 entry_point:
 	.(
@@ -11,8 +11,119 @@ entry_point:
 	;jsr setpalette
 	;jsr iter
 	jsr initvsync
+	.(
 spin
-	jmp spin
+	lda frameno+1
+	cmp #7
+	bne spin
+	.)
+	
+	jsr make_black
+	
+	.(
+spin
+	lda frameno+1
+	cmp #8
+	bne spin
+	.)
+	
+	sei
+	lda #0b01000000
+	sta USR_IER
+	
+	lda oldirq1v
+	sta $204
+	lda oldirq1v+1
+	sta $205
+	cli
+	
+	rts
+	.)
+
+curs1:
+	.word 0
+curs2:
+	.word 0
+curs3:
+	.word 0
+frameno:
+	.word 0
+
+	.context make_black
+	.var2 tmp
+make_black
+	lda #<[selectpal+128]
+	sta %tmp
+	lda #>[selectpal+128]
+	sta %tmp+1
+	
+	ldy #0
+loop
+	lda #<black
+	sta (%tmp),y
+	iny
+	lda #>black
+	sta (%tmp),y
+	iny
+	cpy #128
+	bne loop
+	
+	rts
+	.ctxend
+
+	.alias idx $80
+	.alias tmp $81
+	.alias tmp2 $83
+	.alias tmp3 $85
+swap:
+	.(
+	lda #<selectpal
+	sta tmp
+	lda #>selectpal
+	sta tmp+1
+	
+	lda idx
+	stz tmp3+1
+	asl a
+	rol tmp3+1
+	sta tmp3
+	
+	lda tmp
+	clc
+	adc tmp3
+	sta tmp
+	lda tmp+1
+	adc tmp3+1
+	sta tmp+1
+	
+	lda #<[selectpal+128]
+	sta tmp2
+	lda #>[selectpal+128]
+	sta tmp2+1
+	
+	lda tmp2
+	clc
+	adc tmp3
+	sta tmp2
+	lda tmp2+1
+	adc tmp3+1
+	sta tmp2+1
+	
+	lda (tmp)
+	tax
+	lda (tmp2)
+	sta (tmp)
+	txa
+	sta (tmp2)
+	
+	ldy #1
+	lda (tmp),y
+	tax
+	lda (tmp2),y
+	sta (tmp),y
+	txa
+	sta (tmp2),y
+	
 	rts
 	.)
 
@@ -148,10 +259,12 @@ initvsync
         ;sta USR_ACR
         
         ; Sys VIA CA1 interrupt on positive edge
-        lda SYS_PCR
-        ora #$1
+        lda #4
         sta SYS_PCR
-                
+
+	lda #0
+	sta SYS_ACR
+       
         ; Point at IRQ handler
         lda #<irq1
         ldx #>irq1
@@ -248,7 +361,7 @@ not_last
 	jmp (selectpal,x)
 
 fliptime
-	.word 64 * 28 + 37
+	.word 64 * 28 + 35
 
 vsync
 	phx
@@ -288,6 +401,51 @@ vsync
 	lda #0b11000000
 	sta USR_IER
 
+	lda curs1
+	clc
+	adc #100
+	sta curs1
+	.(
+	bcc nohi
+	inc curs1+1
+	lda curs1+1
+	and #63
+	sta idx
+	jsr swap
+nohi:	.)
+
+	lda curs2
+	clc
+	adc #110
+	sta curs2
+	.(
+	bcc nohi
+	inc curs2+1
+	lda curs2+1
+	and #63
+	sta idx
+	jsr swap
+nohi:	.)
+
+	lda curs3
+	clc
+	adc #155
+	sta curs3
+	.(
+	bcc nohi
+	inc curs3+1
+	lda curs3+1
+	and #63
+	sta idx
+	jsr swap
+nohi:	.)
+
+	.(
+	inc frameno
+	bne nohi
+	inc frameno+1
+nohi:	.)
+
 	; gtfo
 	ply
 	plx
@@ -296,72 +454,6 @@ vsync
 	rti
 	; jmp (oldirq1v)
 	.)
-
-selectpal
-	.word pal0
-	.word pal1
-	.word pal2
-	.word pal3
-	.word pal4
-	.word pal5
-	.word pal6
-	.word pal7
-	.word pal8
-	.word pal9
-	.word pal10
-	.word pal11
-	.word pal12
-	.word pal13
-	.word pal14
-	.word pal15
-	.word pal16
-	.word pal17
-	.word pal18
-	.word pal19
-	.word pal20
-	.word pal21
-	.word pal22
-	.word pal23
-	.word pal24
-	.word pal25
-	.word pal26
-	.word pal27
-	.word pal28
-	.word pal29
-	.word pal30
-	.word pal31
-	.word pal32
-	.word pal33
-	.word pal34
-	.word pal35
-	.word pal36
-	.word pal37
-	.word pal38
-	.word pal39
-	.word pal40
-	.word pal41
-	.word pal42
-	.word pal43
-	.word pal44
-	.word pal45
-	.word pal46
-	.word pal47
-	.word pal48
-	.word pal49
-	.word pal50
-	.word pal51
-	.word pal52
-	.word pal53
-	.word pal54
-	.word pal55
-	.word pal56
-	.word pal57
-	.word pal58
-	.word pal59
-	.word pal60
-	.word pal61
-	.word pal62
-	.word pal63
 
 	.macro palette a b c d f h i k l p
 	ldx #0b10110111 ^ %l
@@ -376,15 +468,165 @@ selectpal
 	lda #0b10100111 ^ %k : sta PALCONTROL	    ; K
 	stx PALCONTROL				    ; L
 	sty PALCONTROL				    ; P
+	jmp done_palette
+	.mend
 
+selectpal
+	.word pal0
+	.word pal1
+	.word pal2
+	.word pal3
+	.word pal4
+	.word pal5
+	.word pal6
+	.word pal7
+	.word pal8
+	
+	.word pal9
+	.word pal10
+	.word pal11
+	.word pal12
+	.word pal13
+	.word pal14
+	.word pal15
+	.word pal16
+	
+	.word pal17
+	.word pal18
+	.word pal19
+	.word pal20
+	.word pal21
+	.word pal22
+	.word pal23
+	.word pal24
+	
+	.word pal25
+	.word pal26
+	.word pal27
+	.word pal28
+	.word pal29
+	.word pal30
+	.word pal31
+	.word pal32
+	
+	.word pal33
+	.word pal34
+	.word pal35
+	.word pal36
+	.word pal37
+	.word pal38
+	.word pal39
+	.word pal40
+	
+	.word pal41
+	.word pal42
+	.word pal43
+	.word pal44
+	.word pal45
+	.word pal46
+	.word pal47
+	.word pal48
+	
+	.word pal49
+	.word pal50
+	.word pal51
+	.word pal52
+	.word pal53
+	.word pal54
+	.word pal55
+	.word pal56
+	
+	.word pal57
+	.word pal58
+	.word pal59
+	.word pal60
+	.word pal61
+	.word pal62
+	.word pal63
+
+	.word pal64
+	.word pal65
+	.word pal66
+	.word pal67
+	.word pal68
+	.word pal69
+	.word pal70
+	.word pal71
+	.word pal72
+	
+	.word pal73
+	.word pal74
+	.word pal75
+	.word pal76
+	.word pal77
+	.word pal78
+	.word pal79
+	.word pal80
+	
+	.word pal81
+	.word pal82
+	.word pal83
+	.word pal84
+	.word pal85
+	.word pal86
+	.word pal87
+	.word pal88
+	
+	.word pal89
+	.word pal90
+	.word pal91
+	.word pal92
+	.word pal93
+	.word pal94
+	.word pal95
+	.word pal96
+	
+	.word pal97
+	.word pal98
+	.word pal99
+	.word pal100
+	.word pal101
+	.word pal102
+	.word pal103
+	.word pal104
+	
+	.word pal105
+	.word pal106
+	.word pal107
+	.word pal108
+	.word pal109
+	.word pal110
+	.word pal111
+	.word pal112
+	
+	.word pal113
+	.word pal114
+	.word pal115
+	.word pal116
+	.word pal117
+	.word pal118
+	.word pal119
+	.word pal120
+	
+	.word pal121
+	.word pal122
+	.word pal123
+	.word pal124
+	.word pal125
+	.word pal126
+	.word pal127
+
+	.include "palette"
+
+black:
+	@palette 0,0,0,0,0,0,0,0,0,0
+
+done_palette
 	ply
 	plx
 	pla
 	sta $fc
 	rti
-	.mend
-
-	.include "palette"
 
 
 ; Now, we have:

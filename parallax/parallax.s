@@ -919,7 +919,7 @@ initvsync
         ;and #$0b00111111
         ;sta USR_ACR
         
-        ; Sys VIA CA1 interrupt on positive edge
+        ; Sys VIA CA1 interrupt
 	lda #4
         sta SYS_PCR
 

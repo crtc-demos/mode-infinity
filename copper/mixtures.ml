@@ -69,18 +69,32 @@ let choose_best r g b =
 
 let pi = 4.0 *. atan 1.0
 
+let pulse x =
+  (0.5 *. cos x +. 0.5) ** 1.7
+
+let pulse2 x =
+  (0.5 *. cos x +. 0.5)
+
 let foo () =
-  for i = 0 to 63 do
-    let fi = (float_of_int i) /. 63.0 in
-    let r = int_of_float (16.0 +. sin (fi *. 2.0 *. pi) *. 16.0)
-    and g = int_of_float (16.0 +. sin (fi *. 2.0 *. pi +. 1.0 *. pi /. 3.0)
-				  *. 16.0)
-    and b = int_of_float (16.0 +. sin (fi *. 2.0 *. pi +. 2.0 *. pi /. 3.0)
-				  *. 16.0) in
-    Printf.printf "pal%d: @palette %s\n" i (choose_best r g b)
+  for i = 0 to 127 do
+    let fi = (float_of_int i) /. 64.0 in
+    if fi < 1.0 then
+      let two_pi_fi = 2.0 *. pi *. fi in
+      let r = int_of_float (pulse (two_pi_fi) *. 32.0)
+      and g = int_of_float (pulse (two_pi_fi +. 2.0 *. pi /. 3.0) *. 32.0)
+      and b = int_of_float (pulse (two_pi_fi +. 4.0 *. pi /. 3.0) *. 32.0) in
+      Printf.printf "pal%d: @palette %s\n" i (choose_best r g b)
+    else
+      let fi = fi -. 1.0 in
+      let two_pi_fi = 2.0 *. pi *. fi in
+      let r = int_of_float (24.0 +. cos (two_pi_fi) *. 8.0)
+      and g = int_of_float (16.0 +. cos (two_pi_fi +. 1.2 *. pi /. 3.0) *. 16.0)
+      and b = int_of_float (20.0 +. cos (two_pi_fi +. 3.5 *. pi /. 3.0) *. 12.0) in
+      Printf.printf "pal%d: @palette %s\n" i
+	(choose_best g r b)
   done
 
-let _ =
+(*let _ =
   for r = 0 to 31 do
     for g = 0 to 31 do
       for b = 0 to 31 do
@@ -88,3 +102,7 @@ let _ =
       done
     done
   done
+*)
+
+let _ =
+  foo ()
