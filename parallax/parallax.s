@@ -29,6 +29,26 @@ spin
 	beq spin
 	sta vsync_ours
 
+	sei
+	lda msg_scrstart
+	clc
+	adc #1
+	sta msg_scrstart
+	.(
+	bcc nohi
+	lda msg_scrstart+1
+	adc #0
+	cmp #$80/8
+	bcc nowrap
+	clc
+	adc #[$30-$80]/8
+nowrap:
+	sta msg_scrstart+1
+nohi:	.)
+	cli
+
+	jsr render_msg_column
+
 	ldx phase+1
 	lda sintab,x
 	tay
@@ -204,6 +224,7 @@ anim_ctr
 	
 	.include "../lib/mos.s"
 	.include "../lib/cmp.s"
+	.include "../font/font.s"
 	
 	.context stripes
 	.var2 ptr
@@ -740,8 +761,149 @@ nowrap:	.)
 	rts
 	.)
 
-; TODO: implement http://www.retrosoftware.co.uk/wiki/index.php/\
-;   How_to_do_the_smooth_vertical_scrolling
+msg_scrstart
+	.word $3000 / 8
+
+message
+	.byte 0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15
+message_ptr
+	.byte 0
+col_idx
+	.byte 0
+
+	.context render_msg_column
+	.var2 col_top, src_col, tmp
+render_msg_column
+	sei
+	lda ACCCON
+	ora #4
+	sta ACCCON
+	cli
+	
+	lda msg_scrstart+1
+	sta %col_top+1
+	lda msg_scrstart
+	asl a
+	rol %col_top+1
+	asl a
+	rol %col_top+1
+	asl a
+	rol %col_top+1
+	sta %col_top
+	
+	; column to write to on screen
+	lda %col_top
+	clc
+	adc #<632
+	sta %col_top
+	lda %col_top+1
+	adc #>632
+	.(
+	cmp #$80
+	bcc nowrap
+	clc
+	adc #$30-$80
+nowrap:	.)
+	sta %col_top+1
+	
+	ldx message_ptr
+	lda message,x
+	
+	stz %tmp+1
+	asl a
+	rol %tmp+1
+	asl a
+	rol %tmp+1
+	sta %tmp
+	
+	lda %tmp
+	clc
+	adc #<font_index
+	sta %tmp
+	lda %tmp+1
+	adc #>font_index
+	sta %tmp+1
+	
+	; %tmp is now first index into column
+	ldy col_idx
+	lda (%tmp),y
+	
+	stz %tmp+1
+	asl a
+	rol %tmp+1
+	asl a
+	rol %tmp+1
+	asl a
+	rol %tmp+1
+	asl a
+	rol %tmp+1
+	
+	; %tmp now multiplied by 16 to find column index
+	
+	clc
+	adc #<font_columns
+	sta %src_col
+	lda %tmp+1
+	adc #>font_columns
+	sta %src_col+1
+	
+	ldy #0 : lda (%src_col),y : sta (%col_top),y
+	ldy #1 : lda (%src_col),y : sta (%col_top),y
+	ldy #2 : lda (%src_col),y : sta (%col_top),y
+	ldy #3 : lda (%src_col),y : sta (%col_top),y
+	ldy #4 : lda (%src_col),y : sta (%col_top),y
+	ldy #5 : lda (%src_col),y : sta (%col_top),y
+	ldy #6 : lda (%src_col),y : sta (%col_top),y
+	ldy #7 : lda (%src_col),y : sta (%col_top),y
+	
+	lda %col_top
+	clc
+	adc #<632
+	sta %col_top
+	lda %col_top+1
+	adc #>632
+	.(
+	cmp #$80
+	bcc nowrap
+	clc
+	adc #$30-$80
+nowrap:	.)
+	sta %col_top+1
+		
+	ldy #8 : lda (%src_col),y : sta (%col_top),y
+	ldy #9 : lda (%src_col),y : sta (%col_top),y
+	ldy #10 : lda (%src_col),y : sta (%col_top),y
+	ldy #11 : lda (%src_col),y : sta (%col_top),y
+	ldy #12 : lda (%src_col),y : sta (%col_top),y
+	ldy #13 : lda (%src_col),y : sta (%col_top),y
+	ldy #14 : lda (%src_col),y : sta (%col_top),y
+	ldy #15 : lda (%src_col),y : sta (%col_top),y
+	
+	.(
+	lda col_idx
+	inc a
+	cmp #4
+	bcc samechar
+	
+	lda message_ptr
+	inc a
+	and #15
+	sta message_ptr
+	
+	lda #0
+samechar
+	sta col_idx
+	.)
+	
+	sei
+	lda ACCCON
+	and #~4
+	sta ACCCON
+	cli
+	
+	rts
+	.ctxend
+
 
 initvsync
 	.(
@@ -763,7 +925,7 @@ initvsync
 
 	; This removes jitters, but stops the keyboard from working!
 	lda #0
-	;sta SYS_ACR
+	sta SYS_ACR
 
 	;lda #15:sta SYS_DDRB
 	;lda #4:sta SYS_ORB:inc a:sta SYS_ORB
@@ -1115,8 +1277,8 @@ first_after_vsync
 	@crtc_write 6, {#top_screen_lines}
 	@crtc_write 7, {#255}
 
-	@crtc_write 12, {#>[$3000/8]}
-	@crtc_write 13, {#<[$3000/8]}
+	@crtc_write 12, msg_scrstart+1
+	@crtc_write 13, msg_scrstart
 
 	;bra next_action_setup
 
@@ -1168,6 +1330,25 @@ inside_boxes
 mode_switch
 	lda #0b11111000
 	sta ULACONTROL
+	lda #0b00000111 ^ 0 : sta PALCONTROL
+	lda #0b00010111 ^ 0 : sta PALCONTROL
+	lda #0b00100111 ^ 1 : sta PALCONTROL
+	lda #0b00110111 ^ 1 : sta PALCONTROL
+	lda #0b01000111 ^ 0 : sta PALCONTROL
+	lda #0b01010111 ^ 0 : sta PALCONTROL
+	lda #0b01100111 ^ 1 : sta PALCONTROL
+	lda #0b01110111 ^ 1 : sta PALCONTROL
+	lda #0b10000111 ^ 2 : sta PALCONTROL
+	lda #0b10010111 ^ 2 : sta PALCONTROL
+	lda #0b10100111 ^ 7 : sta PALCONTROL
+	lda #0b10110111 ^ 7 : sta PALCONTROL
+	lda #0b11000111 ^ 2 : sta PALCONTROL
+	lda #0b11010111 ^ 2 : sta PALCONTROL
+	lda #0b11100111 ^ 7 : sta PALCONTROL
+	lda #0b11110111 ^ 7 : sta PALCONTROL
+	lda ACCCON
+	ora #1
+	sta ACCCON
 
 	bra next_action_setup
 
@@ -1307,6 +1488,9 @@ vsync
 
 	lda #0b11110100
 	sta ULACONTROL
+	lda ACCCON
+	and #~1
+	sta ACCCON
 
 	; gtfo
 	ply

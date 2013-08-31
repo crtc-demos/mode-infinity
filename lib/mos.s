@@ -38,6 +38,8 @@
 
 	.alias ULACONTROL $fe20
 	.alias PALCONTROL $fe21
+	
+	.alias ACCCON $fe34
 
 	; The "notemps" directive says that these functions are safe to call
 	; from within a context. I.e., they use none of the automatically

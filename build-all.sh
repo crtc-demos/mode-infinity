@@ -2,6 +2,8 @@ set -x
 
 cd $(dirname "$0")
 
+rm -rf demodisk.ssd
+
 if [ -x "$(which pasta)" ]; then
   PASTA=$(which pasta)
 else
@@ -39,6 +41,10 @@ export OUTPUTDISK
 set -e
 
 pushd copper
+./compile.sh
+popd
+
+pushd font
 ./compile.sh
 popd
 
