@@ -4,6 +4,20 @@
 start:
 	jsr play_it
 	rts
+
+	lda #0b11011111
+	jsr psg_strobe
+	lda #0b11000110
+	jsr psg_strobe
+	lda #0xfd
+	jsr psg_strobe
+
+	lda #0b11110000
+	jsr psg_strobe
+	lda #0b11100111
+	jsr psg_strobe
+
+	rts
 	
 	.include "../lib/mos.s"
 	.include "ice.s"
@@ -16,6 +30,15 @@ chan2_pitch:
 	.byte 0
 chan3_pitch:
 	.byte 0
+
+c0_pitch_real:
+	.word 0xffff
+c1_pitch_real:
+	.word 0xffff
+c2_pitch_real:
+	.word 0xffff
+c3_pitch_real:
+	.byte 0xff
 
 pe0_pos:
 	.word 0
@@ -148,6 +171,34 @@ psg_strobe:
 	sta %posidx+1
 	.mend
 
+	.macro psg_write_tone_cached write cache latchmask
+	ldy #1
+	lda (%write),y
+	cmp %cache+1
+	bne write_psg
+	lda (%write)
+	cmp %cache
+	beq skip
+	lda (%write),y
+write_psg
+	sta %cache+1
+	ora #%latchmask
+	jsr psg_strobe
+	lda (%write)
+	sta %cache
+	jsr psg_strobe
+skip:
+	.mend
+
+	.macro psg_write_tone_uncached write latchmask
+	ldy #1
+	lda (%write),y
+	ora #%latchmask
+	jsr psg_strobe
+	lda (%write)
+	jsr psg_strobe
+	.mend
+
 	.context play_it
 	.var2 playpos
 	.var2 pitchenvpos
@@ -185,15 +236,7 @@ loop:
 	sta beatpos
 beat:
 	; channel 0
-	ldy beatpos
-	lda ve0_pos
-	sta %volenvpos
-	lda ve0_pos+1
-	sta %volenvpos+1
-	lda (%volenvpos),y
-	ora #0b10010000
-	jsr psg_strobe
-	
+	; pitch
 	ldy beatpos
 	lda pe0_pos
 	sta %pitchenvpos
@@ -211,24 +254,21 @@ beat:
 	lda %tmp+1
 	adc #>song_freqtab
 	sta %tmp+1
-	
-	ldy #1
-	lda (%tmp),y
-	ora #0b10000000
-	jsr psg_strobe
-	lda (%tmp)
+
+	@psg_write_tone_cached %tmp, c0_pitch_real, 0b10000000
+
+	; volume
+	ldy beatpos
+	lda ve0_pos
+	sta %volenvpos
+	lda ve0_pos+1
+	sta %volenvpos+1
+	lda (%volenvpos),y
+	ora #0b10010000
 	jsr psg_strobe
 
 	; channel 1
-	ldy beatpos
-	lda ve1_pos
-	sta %volenvpos
-	lda ve1_pos+1
-	sta %volenvpos+1
-	lda (%volenvpos),y
-	ora #0b10110000
-	jsr psg_strobe
-	
+	; pitch
 	ldy beatpos
 	lda pe1_pos
 	sta %pitchenvpos
@@ -246,24 +286,21 @@ beat:
 	lda %tmp+1
 	adc #>song_freqtab
 	sta %tmp+1
+
+	@psg_write_tone_cached %tmp, c1_pitch_real, 0b10100000
 	
-	ldy #1
-	lda (%tmp),y
-	ora #0b10100000
-	jsr psg_strobe
-	lda (%tmp)
+	; volume
+	ldy beatpos
+	lda ve1_pos
+	sta %volenvpos
+	lda ve1_pos+1
+	sta %volenvpos+1
+	lda (%volenvpos),y
+	ora #0b10110000
 	jsr psg_strobe
 
 	; channel 2
-	ldy beatpos
-	lda ve2_pos
-	sta %volenvpos
-	lda ve2_pos+1
-	sta %volenvpos+1
-	lda (%volenvpos),y
-	ora #0b11010000
-	jsr psg_strobe
-	
+	; pitch
 	ldy beatpos
 	lda pe2_pos
 	sta %pitchenvpos
@@ -281,24 +318,21 @@ beat:
 	lda %tmp+1
 	adc #>song_freqtab
 	sta %tmp+1
-	
-	ldy #1
-	lda (%tmp),y
-	ora #0b11000000
-	jsr psg_strobe
-	lda (%tmp)
+		
+	@psg_write_tone_cached %tmp, c2_pitch_real, 0b11000000
+
+	; volume
+	ldy beatpos
+	lda ve2_pos
+	sta %volenvpos
+	lda ve2_pos+1
+	sta %volenvpos+1
+	lda (%volenvpos),y
+	ora #0b11010000
 	jsr psg_strobe
 
 	; channel 3
-	ldy beatpos
-	lda ve3_pos
-	sta %volenvpos
-	lda ve3_pos+1
-	sta %volenvpos+1
-	lda (%volenvpos),y
-	ora #0b11110000
-	jsr psg_strobe
-	
+	; pitch
 	ldy beatpos
 	lda pe3_pos
 	sta %pitchenvpos
@@ -317,8 +351,23 @@ beat:
 	adc #>song_freqtab
 	sta %tmp+1
 	
+	.(
 	lda (%tmp)
+	cmp c3_pitch_real
+	beq skip
+	sta c3_pitch_real
 	ora #0b11100000
+	jsr psg_strobe
+skip:	.)
+
+	; volume
+	ldy beatpos
+	lda ve3_pos
+	sta %volenvpos
+	lda ve3_pos+1
+	sta %volenvpos+1
+	lda (%volenvpos),y
+	ora #0b11110000
 	jsr psg_strobe
 
 	; ---

@@ -42,8 +42,8 @@ let merge_databytes cmdstream =
 	    else
 	      join rest (Some cmd) false (l :: acc)
 	| Data_byte lo, Some (Latch_tone (c, hi)) ->
-	    join rest last_latched true
-	      (Set_tone (c, (hi lsl 6) lor lo) :: acc)
+	    let tone = if c = 3 then lo else (hi lsl 6) lor lo in
+	    join rest last_latched true (Set_tone (c, tone) :: acc)
 	| Data_byte lo, Some (Latch_vol (c, hi)) ->
 	    (* This is an atypical case.  *)
 	    join rest last_latched true
@@ -275,8 +275,8 @@ let convert_file filename =
   List.iter (fun cmd -> Printf.printf "%s\n" (string_of_cmd cmd)) !outlist;*)
   let outlist = merge_databytes !outlist in
   let outlist = latches_to_sets outlist in
-  (*Printf.printf "After:\n";*)
-  (*List.iter (fun cmd -> Printf.printf "%s\n" (string_of_cmd cmd)) outlist;*)
+  Printf.printf "After:\n";
+  List.iter (fun cmd -> Printf.printf "%s\n" (string_of_cmd cmd)) outlist;
   let freqtab = gather_freqs outlist in
   let fidx = ref 0
   and fht = Hashtbl.create 5 in
