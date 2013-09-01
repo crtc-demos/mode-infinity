@@ -132,7 +132,19 @@ done:	.)
 	inc phase+1
 nohi:	.)
 
-	bra spin
+	lda phase+1
+	cmp #30
+	bcc spin
+
+	jsr deinit_effect
+
+	; FIXME: Stash the next effect in the unused shadow screen memory
+	; instead.  Also free up the shadow screen memory in question!
+	ldx #<next_effect
+	ldy #>next_effect
+	jsr oscli
+
+	rts
 
 auto_loop
 	lda #0
@@ -221,6 +233,9 @@ go_down
 	
 anim_ctr
 	.byte 0
+
+next_effect
+	.asc "run copper",13
 	
 	.include "../lib/mos.s"
 	.include "../lib/cmp.s"
@@ -919,13 +934,20 @@ initvsync
         ;and #$0b00111111
         ;sta USR_ACR
         
+	lda USR_IER
+	sta old_usr_ier
+	
         ; Sys VIA CA1 interrupt
+	lda SYS_PCR
+	sta old_sys_pcr
 	lda #4
         sta SYS_PCR
 
 	; This removes jitters, but stops the keyboard from working!
+	lda SYS_ACR
+	sta old_sys_acr
 	lda #0
-	sta SYS_ACR
+	;sta SYS_ACR
 
 	;lda #15:sta SYS_DDRB
 	;lda #4:sta SYS_ORB:inc a:sta SYS_ORB
@@ -970,6 +992,53 @@ initvsync
         rts
 	.)
 
+deinit_effect
+	.(
+	sei
+	
+	lda oldirq1v
+	sta $204
+	lda oldirq1v+1
+	sta $205
+	
+	lda #$7f
+	sta SYS_IER
+	lda old_sys_ier
+	sta SYS_IER
+	
+	lda old_sys_pcr
+	sta SYS_PCR
+	
+	lda old_sys_acr
+	sta SYS_ACR
+	
+	lda #<1000
+	sta SYS_T1C_L
+	lda #>1000
+	sta SYS_T1C_H
+	
+	lda #<10000
+	sta SYS_T1L_L
+	lda #>10000
+	sta SYS_T1L_H
+	
+	lda #$7f
+	sta USR_IER
+	lda old_usr_ier
+	sta USR_IER
+	
+	@crtc_write 4, {#38}
+	@crtc_write 5, {#0}
+	@crtc_write 6, {#32}
+	@crtc_write 7, {#34}
+	@crtc_write 8, {#0b11000001}
+	@crtc_write 12, {#>[$3000/8]}
+	@crtc_write 13, {#<[$3000/8]}
+	
+	cli
+	rts
+	.)
+
 v_offset
 	.byte 0
 v_offset_usr
@@ -995,6 +1064,12 @@ old_sys_ier
 	.byte 0
 oldirq1v
 	.word 0
+old_sys_pcr
+	.byte 0
+old_sys_acr
+	.byte 0
+old_usr_ier
+	.byte 0
 
 	.alias SECOND_CYCLE_SETUP 0
 	.alias INSIDE_BOXES 1

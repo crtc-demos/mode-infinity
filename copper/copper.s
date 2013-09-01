@@ -27,15 +27,7 @@ spin
 	bne spin
 	.)
 	
-	sei
-	lda #0b01000000
-	sta USR_IER
-	
-	lda oldirq1v
-	sta $204
-	lda oldirq1v+1
-	sta $205
-	cli
+	jsr deinit_effect
 	
 	rts
 	.)
@@ -259,9 +251,13 @@ initvsync
         ;sta USR_ACR
         
         ; Sys VIA CA1 interrupt on positive edge
+	lda SYS_PCR
+	sta old_sys_pcr
         lda #4
         sta SYS_PCR
 
+	lda SYS_ACR
+	sta old_sys_acr
 	lda #0
 	sta SYS_ACR
        
@@ -279,6 +275,9 @@ initvsync
 	;lda #0b00111111
 	;sta USR_IER
         
+	lda USR_IER
+	sta old_usr_ier
+	
 	lda SYS_IER
 	sta old_sys_ier
 	
@@ -300,10 +299,57 @@ initvsync
         rts
 	.)
 
+deinit_effect
+	.(
+	sei
+	lda #0b01000000
+	sta USR_IER
+	
+	lda old_sys_pcr
+	sta SYS_PCR
+	
+	lda old_sys_acr
+	sta SYS_ACR
+	
+	lda #$7f
+	sta SYS_IER
+	lda old_sys_ier
+	sta SYS_IER
+
+	lda #$7f
+	sta USR_IER
+	lda old_usr_ier
+	sta USR_IER
+
+	lda #<1000
+	sta SYS_T1C_L
+	lda #>1000
+	sta SYS_T1C_H
+	
+	lda #<10000
+	sta SYS_T1L_L
+	lda #>10000
+	sta SYS_T1L_H
+	
+	lda oldirq1v
+	sta $204
+	lda oldirq1v+1
+	sta $205
+	cli
+	
+	rts
+	.)
+
 old_sys_ier
 	.byte 0
 oldirq1v
 	.word 0
+old_sys_pcr
+	.byte 0
+old_sys_acr
+	.byte 0
+old_usr_ier
+	.byte 0
 
 .alias index $8f
 .alias max_idx $8e
@@ -361,7 +407,7 @@ not_last
 	jmp (selectpal,x)
 
 fliptime
-	.word 64 * 28 + 35
+	.word 64 * 28 + 34
 
 vsync
 	phx

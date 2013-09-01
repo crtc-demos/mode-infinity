@@ -52,6 +52,10 @@ pushd parallax
 ./compile.sh
 popd
 
+pushd vgmproc
+./compile.sh
+popd
+
 $BBCIM -new demodisk.ssd
 pushd tmpdisk
 $BBCIM -a ../demodisk.ssd *
