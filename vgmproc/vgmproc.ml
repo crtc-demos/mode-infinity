@@ -275,8 +275,8 @@ let convert_file filename =
   List.iter (fun cmd -> Printf.printf "%s\n" (string_of_cmd cmd)) !outlist;*)
   let outlist = merge_databytes !outlist in
   let outlist = latches_to_sets outlist in
-  Printf.printf "After:\n";
-  List.iter (fun cmd -> Printf.printf "%s\n" (string_of_cmd cmd)) outlist;
+  (*Printf.printf "After:\n";
+  List.iter (fun cmd -> Printf.printf "%s\n" (string_of_cmd cmd)) outlist;*)
   let freqtab = gather_freqs outlist in
   let fidx = ref 0
   and fht = Hashtbl.create 5 in
