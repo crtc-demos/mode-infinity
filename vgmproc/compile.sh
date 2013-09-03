@@ -5,4 +5,4 @@ ocamlc vgmproc.ml -o vgmproc
 pasta ice.s -o ice
 pasta player.s -o player
 pasta ptest.s -o ptest
-cp player player.inf ice ice.inf ptest ptest.inf "$OUTPUTDISK"
+cp player player.inf ice ice.inf "$OUTPUTDISK"

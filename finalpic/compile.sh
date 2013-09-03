@@ -7,4 +7,4 @@ cat > final-pic-size.s << EOF
 	.alias final_pic_size $OWLSIZE
 EOF
 # pasta unrle.s -o unrle
-cp owl3 owl3.inf owl3z owl3z.inf unrle unrle.inf "$OUTPUTDISK"
+cp owl3z owl3z.inf unrle unrle.inf "$OUTPUTDISK"

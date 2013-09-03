@@ -18,8 +18,6 @@
 	
 start:
 	@load_file_to player, music_player
-	lda #2
-	jsr mos_setmode
 
 	; Load final pic into SRAM bank 1.
 
@@ -50,6 +48,9 @@ start:
 	cli
 
 	jsr music_initialize
+
+	lda #2
+	jsr mos_setmode
 
 	jsr stripes
 	jsr action_diffs
