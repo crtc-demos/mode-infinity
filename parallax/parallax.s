@@ -42,6 +42,7 @@ start:
 	sta ACCCON
 	cli
 	@load_file_to copper_effect, $3000
+	; Normal screen in main RAM.
 	sei
 	lda ACCCON
 	and #~4
@@ -73,13 +74,13 @@ spin
 	cmp #$80/8
 	bcc nowrap
 	clc
-	adc #[$30-$80]/8
+	adc #[$60-$80]/8
 nowrap:
 	sta msg_scrstart+1
 nohi:	.)
 	cli
 
-	;jsr render_msg_column
+	jsr render_msg_column
 
 	ldx phase+1
 	lda sintab,x
@@ -167,7 +168,7 @@ nohi:	.)
 	jsr music_poll
 
 	lda phase+1
-	cmp #15
+	cmp #250
 	bcc spin
 
 	jsr deinit_effect
@@ -820,7 +821,7 @@ nowrap:	.)
 	.)
 
 msg_scrstart
-	.word $3000 / 8
+	.word $6000 / 8
 
 message
 	.byte 0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15
@@ -849,6 +850,16 @@ render_msg_column
 	rol %col_top+1
 	sta %col_top
 	
+	; Set 8K screen RAM for hw scrolling.
+	sei
+	lda #15
+	sta SYS_DDRB
+	lda #0b1100
+	sta SYS_ORB
+	lda #0b0101
+	sta SYS_ORB
+	cli
+	
 	; column to write to on screen
 	lda %col_top
 	clc
@@ -860,7 +871,7 @@ render_msg_column
 	cmp #$80
 	bcc nowrap
 	clc
-	adc #$30-$80
+	adc #$60-$80
 nowrap:	.)
 	sta %col_top+1
 	
@@ -924,7 +935,7 @@ nowrap:	.)
 	cmp #$80
 	bcc nowrap
 	clc
-	adc #$30-$80
+	adc #$60-$80
 nowrap:	.)
 	sta %col_top+1
 	
@@ -966,6 +977,14 @@ samechar
 	lda ACCCON
 	and #~4
 	sta ACCCON
+
+	; Set 20K screen ram for hw scrolling.
+	lda #15
+	sta SYS_DDRB
+	lda #0b1100
+	sta SYS_ORB
+	lda #0b1101
+	sta SYS_ORB
 	cli
 	
 	rts
@@ -999,7 +1018,7 @@ initvsync
 	lda SYS_ACR
 	sta old_sys_acr
 	lda #0
-	;sta SYS_ACR
+	sta SYS_ACR
 
 	;lda #15:sta SYS_DDRB
 	;lda #4:sta SYS_ORB:inc a:sta SYS_ORB
