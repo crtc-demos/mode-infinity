@@ -215,6 +215,7 @@ let run_conversion cmdstream chan timestep beat peht veht pitch_ht =
 let convert_file filename =
   let tick = 735
   and beat_len = 18
+  and origin = 0x8000
   and prefix = "song_" in
   let fh = open_in_bin filename in
   let inlen = in_channel_length fh in
@@ -312,6 +313,11 @@ let convert_file filename =
     | [], [], [], [] -> ()
     | _ -> Printf.fprintf stderr "Mismatched channel lengths!\n"; exit 1 in
   let fo = open_out Sys.argv.(2) in
+  Printf.fprintf fo "\t.org 0x%x\n" origin;
+  Printf.fprintf fo "\t.word %sfreqtab\n" prefix;
+  Printf.fprintf fo "\t.word %svolenv\n" prefix;
+  Printf.fprintf fo "\t.word %spitchenv\n" prefix;
+  Printf.fprintf fo "\t.word %snotes\n" prefix;
   Printf.fprintf fo "%sfreqtab:\n" prefix;
   let ifht = Hashtbl.create 5 in
   Hashtbl.iter (fun k v -> Hashtbl.add ifht v k) fht;

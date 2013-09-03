@@ -1,4 +1,4 @@
-	.org $e05
+	.org $1200
 	
 	.temps $70..$7f
 	
@@ -17,10 +17,17 @@
 	.alias top_small_box_colour $8b
 	
 start:
+	@load_file_to player, music_player
 	lda #2
 	jsr mos_setmode
+
+	jsr music_initialize
+	
+	;@load_file_to copper_effect, $3000
+
 	jsr stripes
 	jsr action_diffs
+
 	jsr initvsync
 
 spin
@@ -132,11 +139,14 @@ done:	.)
 	inc phase+1
 nohi:	.)
 
+	jsr music_poll
+
 	lda phase+1
-	cmp #30
+	cmp #255
 	bcc spin
 
 	jsr deinit_effect
+	jsr select_old_lang
 
 	; FIXME: Stash the next effect in the unused shadow screen memory
 	; instead.  Also free up the shadow screen memory in question!
@@ -236,10 +246,17 @@ anim_ctr
 
 next_effect
 	.asc "run copper",13
+player
+	.asc "player",13
+copper_effect
+	.asc "copper",13
 	
 	.include "../lib/mos.s"
 	.include "../lib/cmp.s"
 	.include "../font/font.s"
+	.include "../lib/vgmentry.s"
+	.include "../lib/load.s"
+	.include "../lib/sram.s"
 	
 	.context stripes
 	.var2 ptr
@@ -873,10 +890,10 @@ nowrap:	.)
 	
 	lda %col_top
 	clc
-	adc #<632
+	adc #<640
 	sta %col_top
 	lda %col_top+1
-	adc #>632
+	adc #>640
 	.(
 	cmp #$80
 	bcc nowrap
@@ -884,15 +901,24 @@ nowrap:	.)
 	adc #$30-$80
 nowrap:	.)
 	sta %col_top+1
-		
-	ldy #8 : lda (%src_col),y : sta (%col_top),y
-	ldy #9 : lda (%src_col),y : sta (%col_top),y
-	ldy #10 : lda (%src_col),y : sta (%col_top),y
-	ldy #11 : lda (%src_col),y : sta (%col_top),y
-	ldy #12 : lda (%src_col),y : sta (%col_top),y
-	ldy #13 : lda (%src_col),y : sta (%col_top),y
-	ldy #14 : lda (%src_col),y : sta (%col_top),y
-	ldy #15 : lda (%src_col),y : sta (%col_top),y
+	
+	lda %src_col
+	clc
+	adc #8
+	sta %src_col
+	.(
+	bcc nohi
+	inc %src_col+1
+nohi:	.)
+
+	ldy #0 : lda (%src_col),y : sta (%col_top),y
+	ldy #1 : lda (%src_col),y : sta (%col_top),y
+	ldy #2 : lda (%src_col),y : sta (%col_top),y
+	ldy #3 : lda (%src_col),y : sta (%col_top),y
+	ldy #4 : lda (%src_col),y : sta (%col_top),y
+	ldy #5 : lda (%src_col),y : sta (%col_top),y
+	ldy #6 : lda (%src_col),y : sta (%col_top),y
+	ldy #7 : lda (%src_col),y : sta (%col_top),y
 	
 	.(
 	lda col_idx

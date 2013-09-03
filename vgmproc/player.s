@@ -1,26 +1,49 @@
 	.org $e05
 	
-	.temps $70..$7f
-start:
-	jsr play_it
+	.temps $63..$6f
+header:
+	jmp initialize
+	jmp poll
+	jmp deinitialize
+
+	.alias tune $8000
+
+	.alias song_freqtab tune
+	.alias song_volenv tune+2
+	.alias song_pitchenv tune+4
+	.alias song_notes tune+6
+
+	.alias playpos $60
+	.alias beatpos $62
+
+initialize:
+	@load_file_to songname, $3000
+	
+	jsr select_sram
+	ldx #<tune
+	ldy #>tune
+	lda #[16*1024]/256
+	jsr copy_to_sram
+
+	lda song_notes
+	sta playpos
+	lda song_notes+1
+	sta playpos+1
+	
+	stz beatpos
+
 	rts
 
-	lda #0b11011111
-	jsr psg_strobe
-	lda #0b11000110
-	jsr psg_strobe
-	lda #0xfd
-	jsr psg_strobe
+songname:
+	.asc "ice",13
 
-	lda #0b11110000
-	jsr psg_strobe
-	lda #0b11100111
-	jsr psg_strobe
-
+deinitialize:
+	jsr select_old_lang
 	rts
 	
 	.include "../lib/mos.s"
-	.include "ice.s"
+	.include "../lib/load.s"
+	.include "../lib/sram.s"
 
 chan0_pitch:
 	.byte 0
@@ -57,9 +80,6 @@ ve2_pos:
 	.word 0
 ve3_pos:
 	.word 0
-
-beatpos:
-	.byte 0
 
 	; Input: A
 	; Output: A (lo), X (hi)
@@ -152,10 +172,10 @@ psg_strobe:
 	lda (%playpos),y
 	jsr tx18
 	clc
-	adc #<%addrbase
+	adc %addrbase
 	sta %posidx
 	txa
-	adc #>%addrbase
+	adc %addrbase+1
 	sta %posidx+1
 	.mend
 
@@ -199,42 +219,36 @@ skip:
 	jsr psg_strobe
 	.mend
 
-	.context play_it
-	.var2 playpos
+	.context poll
 	.var2 pitchenvpos
 	.var2 volenvpos, tmp
-play_it:
-	lda #<song_notes
-	sta %playpos
-	lda #>song_notes
-	sta %playpos+1
-	
-loop:
+poll:
+	lda beatpos
+	bne continue_beat
+
 	ldy #0
-	lda (%playpos),y
+	lda (playpos),y
 	sta chan0_pitch
 	ldy #3
-	lda (%playpos),y
+	lda (playpos),y
 	sta chan1_pitch
 	ldy #6
-	lda (%playpos),y
+	lda (playpos),y
 	sta chan2_pitch
 	ldy #9
-	lda (%playpos),y
+	lda (playpos),y
 	sta chan3_pitch
 	
-	@init_vpos %playpos, 1, song_pitchenv, pe0_pos
-	@init_vpos %playpos, 2, song_volenv, ve0_pos
-	@init_vpos %playpos, 4, song_pitchenv, pe1_pos
-	@init_vpos %playpos, 5, song_volenv, ve1_pos
-	@init_vpos %playpos, 7, song_pitchenv, pe2_pos
-	@init_vpos %playpos, 8, song_volenv, ve2_pos
-	@init_vpos %playpos, 10, song_pitchenv, pe3_pos
-	@init_vpos %playpos, 11, song_volenv, ve3_pos
+	@init_vpos playpos, 1, song_pitchenv, pe0_pos
+	@init_vpos playpos, 2, song_volenv, ve0_pos
+	@init_vpos playpos, 4, song_pitchenv, pe1_pos
+	@init_vpos playpos, 5, song_volenv, ve1_pos
+	@init_vpos playpos, 7, song_pitchenv, pe2_pos
+	@init_vpos playpos, 8, song_volenv, ve2_pos
+	@init_vpos playpos, 10, song_pitchenv, pe3_pos
+	@init_vpos playpos, 11, song_volenv, ve3_pos
+continue_beat
 	
-	lda #0
-	sta beatpos
-beat:
 	; channel 0
 	; pitch
 	ldy beatpos
@@ -249,10 +263,10 @@ beat:
 	asl a
 	rol %tmp+1
 	clc
-	adc #<song_freqtab
+	adc song_freqtab
 	sta %tmp
 	lda %tmp+1
-	adc #>song_freqtab
+	adc song_freqtab+1
 	sta %tmp+1
 
 	@psg_write_tone_cached %tmp, c0_pitch_real, 0b10000000
@@ -281,10 +295,10 @@ beat:
 	asl a
 	rol %tmp+1
 	clc
-	adc #<song_freqtab
+	adc song_freqtab
 	sta %tmp
 	lda %tmp+1
-	adc #>song_freqtab
+	adc song_freqtab+1
 	sta %tmp+1
 
 	@psg_write_tone_cached %tmp, c1_pitch_real, 0b10100000
@@ -313,10 +327,10 @@ beat:
 	asl a
 	rol %tmp+1
 	clc
-	adc #<song_freqtab
+	adc song_freqtab
 	sta %tmp
 	lda %tmp+1
-	adc #>song_freqtab
+	adc song_freqtab+1
 	sta %tmp+1
 		
 	@psg_write_tone_cached %tmp, c2_pitch_real, 0b11000000
@@ -345,10 +359,10 @@ beat:
 	asl a
 	rol %tmp+1
 	clc
-	adc #<song_freqtab
+	adc song_freqtab
 	sta %tmp
 	lda %tmp+1
-	adc #>song_freqtab
+	adc song_freqtab+1
 	sta %tmp+1
 	
 	.(
@@ -372,24 +386,24 @@ skip:	.)
 
 	; ---
 
-	lda #19
-	jsr osbyte
-
+	.(
 	inc beatpos
 	lda beatpos
 	cmp #18
-	bne beat
+	bne finished
 	
-	lda %playpos
+	stz beatpos
+	
+	lda playpos
 	clc
 	adc #12
-	sta %playpos
+	sta playpos
 	.(
 	bcc nohi
-	inc %playpos+1
+	inc playpos+1
 nohi:	.)
-
-	jmp loop
 	
+finished
+	.)
 	rts
 	.ctxend

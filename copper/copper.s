@@ -1,18 +1,24 @@
-	.org $e00
+	.org $1200
 	
 	.temps $70..$7f
 	
 entry_point:
 	.(
-	lda #0
+	lda #128
 	jsr mos_setmode
-	;jsr fillscreen
-	jsr fillscreen3
-	;jsr setpalette
-	;jsr iter
+	jsr mos_cursoroff
+	jsr select_sram
+	jsr fillscreen
 	jsr initvsync
 	.(
 spin
+	lda frameno
+	cmp vsync_ours
+	beq spin
+	sta vsync_ours
+	
+	jsr music_poll
+
 	lda frameno+1
 	cmp #7
 	bne spin
@@ -22,6 +28,13 @@ spin
 	
 	.(
 spin
+	lda frameno
+	cmp vsync_ours
+	beq spin
+	sta vsync_ours
+	
+	jsr music_poll
+
 	lda frameno+1
 	cmp #8
 	bne spin
@@ -29,8 +42,24 @@ spin
 	
 	jsr deinit_effect
 	
+	lda #1
+	jsr mos_setmode
+	jsr mos_cursoroff
+	
+	@load_file_to nice_picture, $3000
+	
+busy_wait
+	jsr music_poll
+
+	lda #19
+	jsr osbyte
+	bra busy_wait
+	
 	rts
 	.)
+
+nice_picture
+	.asc "owl3",13
 
 curs1:
 	.word 0
@@ -40,6 +69,8 @@ curs3:
 	.word 0
 frameno:
 	.word 0
+vsync_ours:
+	.byte 0xff
 
 	.context make_black
 	.var2 tmp
@@ -120,42 +151,19 @@ swap:
 	.)
 
 	.include "../lib/mos.s"
+	.include "../lib/vgmentry.s"
+	.include "../lib/sram.s"
+	.include "../lib/load.s"
 	
 	.context fillscreen
 	.var2 ptr
 fillscreen
-	lda #<$3000
-	sta %ptr
-	lda #>$3000
-	sta %ptr+1
-	ldy #0
-loop
-	lda #0b00000000
-	sta (%ptr),y
-	iny
-	lda #0b00000000
-	sta (%ptr),y
-	iny
-	lda #0b00000000
-	sta (%ptr),y
-	iny
-	lda #0b00000000
-	sta (%ptr),y
-	iny
-	cpy #0
-	bne loop
+	sei
+	lda ACCCON
+	ora #4
+	sta ACCCON
+	cli
 
-	inc %ptr+1
-	lda %ptr+1
-	cmp #>$8000
-	bne loop
-
-	rts
-	.ctxend
-
-	.context fillscreen3
-	.var2 ptr
-fillscreen3
 	lda #<$3000
 	sta %ptr
 	lda #>$3000
@@ -182,56 +190,11 @@ loop
 	cmp #>$8000
 	bne loop
 
-	rts
-	.ctxend
-
-tops:
-	.byte 0x6d
-	.byte 0xb6
-	.byte 0xdb
-bottoms:
-	.byte 0xb6
-	.byte 0xdb
-	.byte 0x6d
-
-	.context fillscreen2
-	.var2 ptr
-fillscreen2
-	lda #<$3000
-	sta %ptr
-	lda #>$3000
-	sta %ptr+1
-loop
-	ldx #0
-threecolumns
-	ldy #0
-column
-	lda tops,x
-	sta (%ptr),y
-	iny
-	lda bottoms,x
-	sta (%ptr),y
-	iny
-	cpy #8
-	bne column
-
-	lda %ptr
-	clc
-	adc #8
-	sta %ptr
-	.(
-	bcc nohi
-	inc %ptr + 1
-nohi
-	.)
-
-	inx
-	cpx #3
-	bne threecolumns
-
-	lda %ptr+1
-	cmp #>$8000
-	bne loop
+	sei
+	lda ACCCON
+	and #~4
+	sta ACCCON
+	cli
 
 	rts
 	.ctxend
@@ -757,199 +720,3 @@ done_palette
 ;
 ; 2C 4D 2E 2F 2G 11H 4J 7L 1M 4N 9P
 ;       ^^               
-
-	.context setpalette
-setpalette
-	jmp twoway2_25_2
-	
-	lda #155
-	ldx #0b00000001 : jsr osbyte
-	ldx #0b00010001 : jsr osbyte
-	ldx #0b00100001 : jsr osbyte
-	ldx #0b00110001 : jsr osbyte
-	ldx #0b01000001 : jsr osbyte
-	ldx #0b01010001 : jsr osbyte
-	ldx #0b01100001 : jsr osbyte
-	ldx #0b01110001 : jsr osbyte
-	
-	ldx #0b10000011 : jsr osbyte
-	ldx #0b10010011 : jsr osbyte
-	ldx #0b10100011 : jsr osbyte
-	ldx #0b10110011 : jsr osbyte
-	ldx #0b11000011 : jsr osbyte
-	ldx #0b11010011 : jsr osbyte
-	ldx #0b11100011 : jsr osbyte
-	ldx #0b11110011 : jsr osbyte
-partial
-	lda #155
-	ldx #0b00000011 : jsr osbyte
-	ldx #0b00010001 : jsr osbyte
-	ldx #0b00100000 : jsr osbyte
-	ldx #0b00110011 : jsr osbyte
-	ldx #0b01000000 : jsr osbyte
-	ldx #0b01010000 : jsr osbyte
-	ldx #0b01100000 : jsr osbyte
-	ldx #0b01110001 : jsr osbyte
-
-	ldx #0b10000000 : jsr osbyte
-	ldx #0b10010000 : jsr osbyte
-	ldx #0b10100000 : jsr osbyte
-	ldx #0b10110000 : jsr osbyte
-	ldx #0b11000000 : jsr osbyte
-	ldx #0b11010000 : jsr osbyte
-	ldx #0b11100000 : jsr osbyte
-	ldx #0b11110001 : jsr osbyte
-
-threeway
-	lda #155
-	ldx #0b00000001 : jsr osbyte		; A
-	ldx #0b00010001 : jsr osbyte		; B
-	ldx #0b00100011 : jsr osbyte		; C
-	ldx #0b00110011 : jsr osbyte		; D
-	ldx #0b01000001 : jsr osbyte		; E
-	ldx #0b01010001 : jsr osbyte		; F
-	ldx #0b01100001 : jsr osbyte		; G
-	ldx #0b01110001 : jsr osbyte		; H
-
-	ldx #0b10000001 : jsr osbyte		; I
-	ldx #0b10010001 : jsr osbyte		; J
-	ldx #0b10100001 : jsr osbyte		; K
-	ldx #0b10110001 : jsr osbyte		; L
-	ldx #0b11000001 : jsr osbyte		; M
-	ldx #0b11010001 : jsr osbyte		; N
-	ldx #0b11100001 : jsr osbyte		; O
-	ldx #0b11110011 : jsr osbyte		; P
-
-twoway2_125
-	lda #155
-	ldx #0b00000011 : jsr osbyte		; A
-	ldx #0b00010001 : jsr osbyte		; B
-	ldx #0b00100001 : jsr osbyte		; C
-	ldx #0b00110001 : jsr osbyte		; D
-	ldx #0b01000001 : jsr osbyte		; E
-	ldx #0b01010001 : jsr osbyte		; F
-	ldx #0b01100001 : jsr osbyte		; G
-	ldx #0b01110001 : jsr osbyte		; H
-
-	ldx #0b10000011 : jsr osbyte		; I
-	ldx #0b10010001 : jsr osbyte		; J
-	ldx #0b10100001 : jsr osbyte		; K
-	ldx #0b10110011 : jsr osbyte		; L
-	ldx #0b11000001 : jsr osbyte		; M
-	ldx #0b11010001 : jsr osbyte		; N
-	ldx #0b11100001 : jsr osbyte		; O
-	ldx #0b11110001 : jsr osbyte		; P
-	rts
-
-twoway2_25
-	lda #155
-	ldx #0b00000001 : jsr osbyte		; A
-	ldx #0b00010011 : jsr osbyte		; B
-	ldx #0b00100001 : jsr osbyte		; C
-	ldx #0b00110001 : jsr osbyte		; D
-	ldx #0b01000001 : jsr osbyte		; E
-	ldx #0b01010011 : jsr osbyte		; F
-	ldx #0b01100001 : jsr osbyte		; G
-	ldx #0b01110011 : jsr osbyte		; H
-
-	ldx #0b10000001 : jsr osbyte		; I
-	ldx #0b10010001 : jsr osbyte		; J
-	ldx #0b10100001 : jsr osbyte		; K
-	ldx #0b10110001 : jsr osbyte		; L
-	ldx #0b11000001 : jsr osbyte		; M
-	ldx #0b11010001 : jsr osbyte		; N
-	ldx #0b11100001 : jsr osbyte		; O
-	ldx #0b11110001 : jsr osbyte		; P
-	rts
-
-twoway2_25_2
-	lda #155
-	ldx #0b00000011 : jsr osbyte		; A
-	ldx #0b00010011 : jsr osbyte		; B
-	ldx #0b00100011 : jsr osbyte		; C
-	ldx #0b00110001 : jsr osbyte		; D
-	ldx #0b01000001 : jsr osbyte		; E
-	ldx #0b01010001 : jsr osbyte		; F
-	ldx #0b01100001 : jsr osbyte		; G
-	ldx #0b01110001 : jsr osbyte		; H
-
-	ldx #0b10000001 : jsr osbyte		; I
-	ldx #0b10010001 : jsr osbyte		; J
-	ldx #0b10100011 : jsr osbyte		; K
-	ldx #0b10110011 : jsr osbyte		; L
-	ldx #0b11000001 : jsr osbyte		; M
-	ldx #0b11010001 : jsr osbyte		; N
-	ldx #0b11100001 : jsr osbyte		; O
-	ldx #0b11110001 : jsr osbyte		; P
-	rts
-
-twoway2_375
-	lda #155
-	ldx #0b00000011 : jsr osbyte		; A
-	ldx #0b00010011 : jsr osbyte		; B
-	ldx #0b00100001 : jsr osbyte		; C
-	ldx #0b00110001 : jsr osbyte		; D
-	ldx #0b01000001 : jsr osbyte		; E
-	ldx #0b01010011 : jsr osbyte		; F
-	ldx #0b01100001 : jsr osbyte		; G
-	ldx #0b01110011 : jsr osbyte		; H
-
-	ldx #0b10000011 : jsr osbyte		; I
-	ldx #0b10010001 : jsr osbyte		; J
-	ldx #0b10100001 : jsr osbyte		; K
-	ldx #0b10110011 : jsr osbyte		; L
-	ldx #0b11000001 : jsr osbyte		; M
-	ldx #0b11010001 : jsr osbyte		; N
-	ldx #0b11100001 : jsr osbyte		; O
-	ldx #0b11110001 : jsr osbyte		; P
-	rts
-
-twoway2_50
-	lda #155
-	ldx #0b00000011 : jsr osbyte		; A
-	ldx #0b00010011 : jsr osbyte		; B
-	ldx #0b00100011 : jsr osbyte		; C
-	ldx #0b00110011 : jsr osbyte		; D
-	ldx #0b01000001 : jsr osbyte		; E
-	ldx #0b01010011 : jsr osbyte		; F
-	ldx #0b01100001 : jsr osbyte		; G
-	ldx #0b01110011 : jsr osbyte		; H
-
-	ldx #0b10000011 : jsr osbyte		; I
-	ldx #0b10010001 : jsr osbyte		; J
-	ldx #0b10100011 : jsr osbyte		; K
-	ldx #0b10110011 : jsr osbyte		; L
-	ldx #0b11000001 : jsr osbyte		; M
-	ldx #0b11010001 : jsr osbyte		; N
-	ldx #0b11100001 : jsr osbyte		; O
-	ldx #0b11110001 : jsr osbyte		; P
-
-	rts
-	.ctxend
-
-	.context iter
-	.var2 ptr
-	.var val
-iter
-	lda #<$3000
-	sta %ptr
-	lda #>$3000
-	sta %ptr+1
-	ldy #0
-loop
-	lda %val
-	sta (%ptr),y
-	iny
-	cpy #0
-	bne loop
-
-	inc %ptr+1
-	lda %ptr+1
-	cmp #>$8000
-	bne loop
-
-	inc %val
-	jmp iter
-
-	rts
-	.ctxend

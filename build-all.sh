@@ -56,6 +56,10 @@ pushd vgmproc
 ./compile.sh
 popd
 
+pushd finalpic
+./compile.sh
+popd
+
 $BBCIM -new demodisk.ssd
 pushd tmpdisk
 $BBCIM -a ../demodisk.ssd *

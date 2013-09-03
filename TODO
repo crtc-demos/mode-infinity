@@ -1,0 +1,18 @@
+TODO
+====
+
+* Preload all assets: final pic in SR bank 5. Copper effect in shadow screen memory $3000-$6000.
+
+* Modify scroller to use 8K screen size (and switch back for main effect!).
+
+* Modify RLE decompressor to work with owl3z final picture. Interleave ROM bank accesses!
+
+* Seamless transitions for tune parts. (IRQ -- or actually eventv -- whilst shuffling data between effects.)
+
+* Import tunk's font (WIP)
+
+* Make a stupid message.
+
+* Effect buildup for parallax (big squares horizontal, big squares vertical, small squares appear, rotation, ...?)
+
+* Import ruairi's tune (when ready)
