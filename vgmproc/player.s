@@ -5,6 +5,7 @@ header:
 	jmp initialize
 	jmp poll
 	jmp deinitialize
+	jmp copy_effect_from_shadow
 
 	.alias tune $8000
 
@@ -19,6 +20,7 @@ header:
 initialize:
 	@load_file_to songname, $3000
 	
+	lda #BANK0
 	jsr select_sram
 	ldx #<tune
 	ldy #>tune
@@ -37,13 +39,70 @@ initialize:
 songname:
 	.asc "ice",13
 
+	.alias chain_next_effect $1200
+	.notemps chain_next_effect
+
 deinitialize:
 	jsr select_old_lang
 	rts
+
+	; Copy A*256 bytes from $3000 to $1200. Entry with shadow bank in
+	; memory space.
+	.context copy_effect_from_shadow
+	.var2 src, dst
+	.var tmp
+copy_effect_from_shadow
+	tax
+	lda #<$3000
+	sta %src
+	lda #>$3000
+	sta %src+1
+	lda #<$1200
+	sta %dst
+	lda #>$1200
+	sta %dst+1
+	ldy #0
+loop
+	; Get byte, maybe from shadow RAM...
+	sei
+	lda ACCCON
+	ora #4
+	sta ACCCON
+	cli
+	lda (%src),y
+	sta %tmp
+
+	; Stick it back in normal RAM.
 	
+	sei
+	lda ACCCON
+	and #~4
+	sta ACCCON
+	cli
+
+	lda %tmp
+	
+	sta (%dst),y
+	iny
+	bne loop
+	inc %src + 1
+	inc %dst + 1
+	dex
+	bne loop
+	
+	lda ACCCON
+	and #~4
+	sta ACCCON
+	
+	; Chain to next effect
+	jmp chain_next_effect
+	
+	.ctxend
+
 	.include "../lib/mos.s"
 	.include "../lib/load.s"
 	.include "../lib/sram.s"
+	.include "../lib/srambanks.s"
 
 chan0_pitch:
 	.byte 0

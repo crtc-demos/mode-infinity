@@ -5,3 +5,4 @@
 	.alias music_initialize music_player
 	.alias music_poll music_player+3
 	.alias music_deinitialize music_player+6
+	.alias copy_effect_from_shadow music_player+9

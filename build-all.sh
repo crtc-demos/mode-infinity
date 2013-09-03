@@ -48,15 +48,15 @@ pushd font
 ./compile.sh
 popd
 
+pushd finalpic
+./compile.sh
+popd
+
 pushd parallax
 ./compile.sh
 popd
 
 pushd vgmproc
-./compile.sh
-popd
-
-pushd finalpic
 ./compile.sh
 popd
 

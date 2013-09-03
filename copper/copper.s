@@ -7,6 +7,7 @@ entry_point:
 	lda #128
 	jsr mos_setmode
 	jsr mos_cursoroff
+	lda #BANK0
 	jsr select_sram
 	jsr fillscreen
 	jsr initvsync
@@ -46,7 +47,22 @@ spin
 	jsr mos_setmode
 	jsr mos_cursoroff
 	
-	@load_file_to nice_picture, $3000
+	;@load_file_to nice_picture, $3000
+	lda #<$8000
+	sta %unpack_rle.start_address
+	lda #>$8000
+	sta %unpack_rle.start_address+1
+	lda #<$3000
+	sta %unpack_rle.screenptr
+	lda #>$3000
+	sta %unpack_rle.screenptr+1
+	
+	lda #BANK1
+	jsr select_sram
+	
+	jsr unpack_rle
+	
+	jsr select_old_lang
 	
 busy_wait
 	jsr music_poll
@@ -154,7 +170,8 @@ swap:
 	.include "../lib/vgmentry.s"
 	.include "../lib/sram.s"
 	.include "../lib/load.s"
-	
+	.include "../lib/srambanks.s"
+
 	.context fillscreen
 	.var2 ptr
 fillscreen
@@ -313,6 +330,9 @@ old_sys_acr
 	.byte 0
 old_usr_ier
 	.byte 0
+
+	; This must be entirely below $3000...
+	.include "../finalpic/unrle.s"
 
 .alias index $8f
 .alias max_idx $8e
@@ -636,7 +656,6 @@ done_palette
 	pla
 	sta $fc
 	rti
-
 
 ; Now, we have:
 ;   0  1  0  1  0  1  0  1

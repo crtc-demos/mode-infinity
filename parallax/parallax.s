@@ -21,9 +21,34 @@ start:
 	lda #2
 	jsr mos_setmode
 
-	jsr music_initialize
+	; Load final pic into SRAM bank 1.
+
+	@load_file_to final_pic, $3000
+
+	lda #BANK1
+	jsr select_sram
+
+	ldx #<$8000
+	ldy #>$8000
+	lda #>[final_pic_size+255]
+	jsr copy_to_sram
 	
-	;@load_file_to copper_effect, $3000
+	jsr select_old_lang
+
+	; Shadow bank in main RAM.
+	sei
+	lda ACCCON
+	ora #4
+	sta ACCCON
+	cli
+	@load_file_to copper_effect, $3000
+	sei
+	lda ACCCON
+	and #~4
+	sta ACCCON
+	cli
+
+	jsr music_initialize
 
 	jsr stripes
 	jsr action_diffs
@@ -54,7 +79,7 @@ nowrap:
 nohi:	.)
 	cli
 
-	jsr render_msg_column
+	;jsr render_msg_column
 
 	ldx phase+1
 	lda sintab,x
@@ -142,19 +167,15 @@ nohi:	.)
 	jsr music_poll
 
 	lda phase+1
-	cmp #255
+	cmp #15
 	bcc spin
 
 	jsr deinit_effect
-	jsr select_old_lang
+	jsr music_deinitialize
 
-	; FIXME: Stash the next effect in the unused shadow screen memory
-	; instead.  Also free up the shadow screen memory in question!
-	ldx #<next_effect
-	ldy #>next_effect
-	jsr oscli
-
-	rts
+	; Copy the next effect from shadow RAM and then start it.
+	lda #>[copper_size+255]
+	jmp copy_effect_from_shadow
 
 auto_loop
 	lda #0
@@ -250,6 +271,8 @@ player
 	.asc "player",13
 copper_effect
 	.asc "copper",13
+final_pic
+	.asc "owl3z",13
 	
 	.include "../lib/mos.s"
 	.include "../lib/cmp.s"
@@ -257,6 +280,9 @@ copper_effect
 	.include "../lib/vgmentry.s"
 	.include "../lib/load.s"
 	.include "../lib/sram.s"
+	.include "../lib/srambanks.s"
+	.include "../copper/copper-size.s"
+	.include "../finalpic/final-pic-size.s"
 	
 	.context stripes
 	.var2 ptr

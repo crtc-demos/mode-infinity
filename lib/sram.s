@@ -6,9 +6,10 @@ old_lang:
 
 select_sram:
 	.(
+	pha
 	lda $f4
 	sta old_lang
-	lda #use_sram_bank
+	pla
 	; must save to ram copy of ROMSEL first!
 	sta $f4
 	sta $fe30
