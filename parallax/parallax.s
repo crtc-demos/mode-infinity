@@ -849,17 +849,7 @@ render_msg_column
 	asl a
 	rol %col_top+1
 	sta %col_top
-	
-	; Set 8K screen RAM for hw scrolling.
-	sei
-	lda #15
-	sta SYS_DDRB
-	lda #0b1100
-	sta SYS_ORB
-	lda #0b0101
-	sta SYS_ORB
-	cli
-	
+		
 	; column to write to on screen
 	lda %col_top
 	clc
@@ -977,16 +967,8 @@ samechar
 	lda ACCCON
 	and #~4
 	sta ACCCON
-
-	; Set 20K screen ram for hw scrolling.
-	lda #15
-	sta SYS_DDRB
-	lda #0b1100
-	sta SYS_ORB
-	lda #0b1101
-	sta SYS_ORB
 	cli
-	
+
 	rts
 	.ctxend
 
@@ -1542,6 +1524,14 @@ disable_irq
 	;lda #0b11100111 ^ 4 : sta PALCONTROL
 	;lda #0b11110111 ^ 0 : sta PALCONTROL
 
+	; Set 8K screen RAM for hw scrolling.
+	lda #15
+	sta SYS_DDRB
+	lda #0b1100
+	sta SYS_ORB
+	lda #0b0101
+	sta SYS_ORB
+
 exit_timer1:
 	ply
 	plx
@@ -1637,6 +1627,15 @@ vsync
 	lda ACCCON
 	and #~1
 	sta ACCCON
+
+	; Set 20K screen ram for hw scrolling. Note the AUG has the wrong values
+	; in the table for these!
+	lda #15
+	sta SYS_DDRB
+	lda #0b0100
+	sta SYS_ORB
+	lda #0b1101
+	sta SYS_ORB
 
 	; gtfo
 	ply
