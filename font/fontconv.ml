@@ -49,9 +49,9 @@ let conv_font ht img xchars ychars =
     indices := idx :: !indices in
   for y = 0 to ychars - 1 do
     for x = 0 to xchars - 1 do
-      let xcpos = x * 16
+      let xcpos = x * 4
       and ycpos = y * 16 in
-      for col = 0 to 3 do
+      for col = 0 to 0 do
         let rowlist = ref [] in
         for row = 0 to 15 do
 	  let pix0 = Rgba32.get img (xcpos + 4 * col) (ycpos + row)
@@ -84,9 +84,9 @@ let _ =
   end;
   let img = Images.load !infile [] in
   let xsize, ysize = Images.size img in
-  (*Printf.fprintf stderr "Got image: size %d x %d\n" xsize ysize;*)
+  Printf.fprintf stderr "Got image: size %d x %d\n" xsize ysize;
   let ht = Hashtbl.create 5 in
-  let indices, num = conv_font ht (make_rgba32 img) (xsize / 16) (ysize / 16) in
+  let indices, num = conv_font ht (make_rgba32 img) (xsize / 4) (ysize / 16) in
   Printf.fprintf stderr "Unique columns: %d\n" num;
   let fo = open_out !outfile in
   (*List.iter (fun idx -> Printf.printf "idx: %n\n" idx) indices*)
@@ -99,6 +99,6 @@ let _ =
     let column = Hashtbl.find iht i in
     List.iter (fun n -> Printf.fprintf fo "\t.byte %d\n" n) (List.rev column)
   done;
-  Printf.fprintf fo "font_index:\n";
-  List.iter (fun n -> Printf.fprintf fo "\t.byte %d\n" n) (List.rev indices);
+  (*Printf.fprintf fo "font_index:\n";
+  List.iter (fun n -> Printf.fprintf fo "\t.byte %d\n" n) (List.rev indices);*)
   close_out fo

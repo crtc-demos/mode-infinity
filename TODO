@@ -1,15 +1,15 @@
 TODO
 ====
 
-* Preload all assets: final pic in SR bank 5. Copper effect in shadow screen memory $3000-$6000.
+* Preload all assets: final pic in SR bank 5. Copper effect in shadow screen memory $3000-$6000. [done]
 
-* Modify scroller to use 8K screen size (and switch back for main effect!).
+* Modify scroller to use 8K screen size (and switch back for main effect!). [done]
 
-* Modify RLE decompressor to work with owl3z final picture. Interleave ROM bank accesses! [RLE working]
+* Modify RLE decompressor to work with owl3z final picture. Interleave ROM bank accesses! [RLE working, tune pauses for now.]
 
 * Seamless transitions for tune parts. (IRQ -- or actually eventv -- whilst shuffling data between effects.)
 
-* Import tunk's font (WIP)
+* Import tunk's font (WIP) [done]
 
 * Make a stupid message.
 

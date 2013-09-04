@@ -169,11 +169,17 @@ nohi:	.)
 	jsr music_poll
 
 	lda phase+1
-	cmp #250
+	cmp #30
 	bcc spin
 
 	jsr deinit_effect
 	jsr music_deinitialize
+
+	lda #1
+	jsr mos_setmode
+	jsr mos_cursoroff
+
+	jsr adding_colours
 
 	; Copy the next effect from shadow RAM and then start it.
 	lda #>[copper_size+255]
@@ -278,13 +284,37 @@ final_pic
 	
 	.include "../lib/mos.s"
 	.include "../lib/cmp.s"
-	.include "../font/font.s"
+	.include "../font/36font.s"
 	.include "../lib/vgmentry.s"
 	.include "../lib/load.s"
 	.include "../lib/sram.s"
 	.include "../lib/srambanks.s"
 	.include "../copper/copper-size.s"
 	.include "../finalpic/final-pic-size.s"
+	
+	.context adding_colours
+	.var tmp
+adding_colours
+	ldx #0
+loop
+	lda addcol,x
+	beq done
+	jsr osasci
+	inx
+	bra loop
+done
+	lda #200
+	sta %tmp
+wait:
+	lda #19
+	jsr osbyte
+	dec %tmp
+	bne wait
+	rts
+addcol
+	.asc 13,13,"Adding colours to graphics hardware...",13,13
+	.asc "Please wait.",0
+	.ctxend
 	
 	.context stripes
 	.var2 ptr
@@ -824,15 +854,21 @@ nowrap:	.)
 msg_scrstart
 	.word $6000 / 8
 
-message
-	.byte 0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15
+	.include "message.s"
+;message
+;	.byte 0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15
+;	.byte 16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31
+;	.byte 32,33,34,35,36,37,38,39
 message_ptr
-	.byte 0
+	.word 0
 col_idx
+	.byte 255
+current_char_numcols
 	.byte 0
 
 	.context render_msg_column
 	.var2 col_top, src_col, tmp
+	.var2 message_tmp
 render_msg_column
 	sei
 	lda ACCCON
@@ -866,28 +902,39 @@ render_msg_column
 nowrap:	.)
 	sta %col_top+1
 	
-	ldx message_ptr
-	lda message,x
-	
-	stz %tmp+1
-	asl a
-	rol %tmp+1
-	asl a
-	rol %tmp+1
-	sta %tmp
-	
-	lda %tmp
+	lda #<message
 	clc
-	adc #<font_index
-	sta %tmp
-	lda %tmp+1
-	adc #>font_index
-	sta %tmp+1
+	adc message_ptr
+	sta %message_tmp
+	lda #>message
+	adc message_ptr+1
+	sta %message_tmp+1
+
+	lda (%message_tmp)
 	
+	tax
+	lda char_lens,x
+	sta current_char_numcols
+
+	lda char_starts,x
+	clc
+	adc #<char_columns
+	sta %tmp
+	lda #0
+	adc #>char_columns
+	sta %tmp+1
+		
 	; %tmp is now first index into column
 	ldy col_idx
+	cpy #255
+	bne not_interchar_column
+	; The space column.
+	lda #36
+	bra interchar_column
+not_interchar_column
 	lda (%tmp),y
 	
+interchar_column
 	stz %tmp+1
 	asl a
 	rol %tmp+1
@@ -899,7 +946,6 @@ nowrap:	.)
 	rol %tmp+1
 	
 	; %tmp now multiplied by 16 to find column index
-	
 	clc
 	adc #<font_columns
 	sta %src_col
@@ -951,15 +997,23 @@ nohi:	.)
 	.(
 	lda col_idx
 	inc a
-	cmp #4
+	cmp current_char_numcols
 	bcc samechar
 	
-	lda message_ptr
-	inc a
-	and #15
-	sta message_ptr
+	.(
+	inc message_ptr
+	bne nohi
+	inc message_ptr+1
+nohi:	.)
+
+	.(
+	@if_ltu_imm message_ptr, message_length, not_end
+	stz message_ptr
+	stz message_ptr+1
+not_end:
+	.)
 	
-	lda #0
+	lda #255
 samechar
 	sta col_idx
 	.)
