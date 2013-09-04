@@ -15,9 +15,13 @@
 	.alias pal_ptr $88
 	.alias offset $8a
 	.alias top_small_box_colour $8b
+	.alias bg_colour $8c
+	.alias small_box_colour $8d
 	
 start:
 	@load_file_to player, music_player
+
+	jsr set_mode_inf
 
 	; Load final pic into SRAM bank 1.
 
@@ -55,14 +59,24 @@ start:
 	jsr stripes
 	jsr action_diffs
 
+	lda #7 ^ 7
+	jsr recolour_big_boxes
+
+	lda #0 ^ 7
+	sta bg_colour
+	lda #0 ^ 7
+	sta small_box_colour
+	jsr recolour_outside_boxes
+
 	jsr initvsync
 
-spin
+effect_loop
 	lda vsync_ctr
 	cmp vsync_ours
-	beq spin
+	beq effect_loop
 	sta vsync_ours
 
+	; Scroll message.
 	sei
 	lda msg_scrstart
 	clc
@@ -83,6 +97,42 @@ nohi:	.)
 
 	jsr render_msg_column
 
+	lda effect_state
+	cmp #0
+	beq just_horiz
+	cmp #1
+	beq just_vert
+	cmp #2
+	bcs spinning
+	
+just_horiz:
+	lda #1
+	sta %scroll_left.amount
+	jsr scroll_left
+
+	.(
+	lda vsync_ctr+1
+	cmp #4
+	bcc keep_going
+	inc effect_state
+keep_going
+	.)
+
+	jmp finish_iteration
+
+just_vert
+	inc v_offset_usr
+	
+	.(
+	lda vsync_ctr+1
+	cmp #8
+	bcc keep_going
+	inc effect_state
+keep_going
+	.)
+	jmp finish_iteration
+
+spinning:
 	ldx phase+1
 	lda sintab,x
 	tay
@@ -166,11 +216,102 @@ done:	.)
 	inc phase+1
 nohi:	.)
 
-	jsr music_poll
+	; Some colour switching effects
+	.(
+	lda effect_state
+	cmp #3
+	bcs end_effect_state
 
 	lda phase+1
-	cmp #30
-	bcc spin
+	cmp #40
+	bcs enable_small_boxes_yellow
+	cmp #38
+	bcs enable_small_boxes_red
+	cmp #36
+	bcs goblack
+	cmp #34
+	bcs goblue
+	cmp #32
+	bcs gocyan
+	bra done
+
+enable_small_boxes_red
+	lda #0 ^ 7
+	sta bg_colour
+	lda #1 ^ 7
+	sta small_box_colour
+	jsr recolour_outside_boxes
+	bra done
+
+enable_small_boxes_yellow
+	lda #1 ^ 7
+	sta bg_colour
+	lda #3 ^ 7
+	sta small_box_colour
+	jsr recolour_outside_boxes
+	inc effect_state
+	bra done
+
+gocyan:
+	lda #6 ^ 7
+	jsr recolour_big_boxes
+	bra done
+
+goblue:
+	lda #4 ^ 7
+	jsr recolour_big_boxes
+	bra done
+
+goblack:
+	lda #0 ^ 7
+	jsr recolour_big_boxes
+	bra done
+done:
+	.)
+	bra finish_iteration
+
+	; Effect states 3+ are processed here.
+end_effect_state:
+	.(
+	; Now phase will be going around from 40 upwards.
+	lda effect_state
+	cmp #4
+	bcs final_spin
+	; State 3: wait for phase to fall below 20.
+	lda phase+1
+	cmp #20
+	bcs done
+	inc effect_state
+	bra done
+final_spin
+	lda phase+1
+	cmp #60
+	bcs exit_effect
+	cmp #46
+	bcs small_boxes_black
+	cmp #44
+	bcs small_boxes_red_again
+	bra done
+small_boxes_red_again
+	lda #0 ^ 7
+	sta bg_colour
+	lda #1 ^ 7
+	sta small_box_colour
+	jsr recolour_outside_boxes
+	bra done
+small_boxes_black
+	lda #0 ^ 7
+	sta bg_colour
+	sta small_box_colour
+	jsr recolour_outside_boxes
+done:
+	.)
+
+finish_iteration
+	jsr music_poll
+	jmp effect_loop
+
+exit_effect
 
 	jsr deinit_effect
 	jsr music_deinitialize
@@ -184,93 +325,11 @@ nohi:	.)
 	; Copy the next effect from shadow RAM and then start it.
 	lda #>[copper_size+255]
 	jmp copy_effect_from_shadow
-
-auto_loop
-	lda #0
-	sta anim_ctr
-loop_left
-	lda #1
-	sta %scroll_left.amount
-	jsr scroll_left
-	
-	inc anim_ctr
-	lda anim_ctr
-	cmp #255
-	bne loop_left
-	
-	lda #0
-	sta anim_ctr
-loop_right
-	lda #1
-	sta %scroll_right.amount
-	jsr scroll_right
-	
-	inc anim_ctr
-	lda anim_ctr
-	cmp #255
-	bne loop_right
-	
-	bra auto_loop
-
-scroll_loop
-	lda #129
-	ldx #<1000
-	ldy #>1000
-	jsr osbyte
-	bcs scroll_loop
-	cpx #'Q'
-	beq spin
-	cpx #'1'
-	beq s1
-	cpx #'2'
-	beq s2
-	cpx #'3'
-	beq s3
-	cpx #'7'
-	beq l1
-	cpx #'8'
-	beq l2
-	cpx #'9'
-	beq l3
-	cpx #'U'
-	beq go_up
-	cpx #'D'
-	beq go_down
-	bra scroll_loop
-s1:	lda #1
-	bra do_lscroll
-s2:	lda #2
-	bra do_lscroll
-s3:	lda #3
-do_lscroll
-	sta %scroll_left.amount
-	jsr scroll_left
-	;jsr horiz_scroll_bg_layer
-	bra scroll_loop
-
-l1:	lda #1
-	bra do_rscroll
-l2:	lda #2
-	bra do_rscroll
-l3:	lda #3
-do_rscroll:
-	sta %scroll_right.amount
-	jsr scroll_right
-	;jsr horiz_scroll_bg_layer
-
-	bra scroll_loop
-
-go_up
-	inc v_offset
-	bra scroll_loop
-
-go_down
-	dec v_offset
-	bra scroll_loop
-
-	rts
 	
 anim_ctr
+	.byte 0
+
+effect_state
 	.byte 0
 
 next_effect
@@ -292,6 +351,22 @@ final_pic
 	.include "../copper/copper-size.s"
 	.include "../finalpic/final-pic-size.s"
 	
+	.context set_mode_inf
+	.var tmp
+set_mode_inf
+	ldx #0
+loop
+	lda setminf,x
+	beq done
+	jsr osasci
+	inx
+	bra loop
+done:
+	rts
+setminf:
+	.asc "*B.",13,"BASIC",13,13,">MODE /0",13,0
+	.ctxend
+	
 	.context adding_colours
 	.var tmp
 adding_colours
@@ -312,7 +387,7 @@ wait:
 	bne wait
 	rts
 addcol
-	.asc 13,13,"Adding colours to graphics hardware...",13,13
+	.asc 13,13,"Enhancing graphics hardware...",13,13
 	.asc "Please wait.",0
 	.ctxend
 	
@@ -748,8 +823,7 @@ skip:	.)
 	; Update palette for BG layer by modifying code. Set to
 	; "bglayer_offset".
 
-horiz_scroll_bg_layer
-	.(
+	.macro horiz_scroll_bg_layer
 	lda #<[inside_boxes+1]
 	sta pal_ptr
 	lda #>[inside_boxes+1]
@@ -762,12 +836,14 @@ loop
 	cmp #8
 	bcs outside
 	lda (pal_ptr),y
-	and #0b11111100
+	and #0b11110000
+	ora small_box_colour
 	sta (pal_ptr),y
 	bra done
 outside
 	lda (pal_ptr),y
-	ora #0b00000010
+	and #0b11110000
+	ora bg_colour
 	sta (pal_ptr),y
 done
 	tya
@@ -775,22 +851,59 @@ done
 	adc #5
 	tay
 	
-	.(
 	inc offset
 	lda offset
 	cmp #15
 	bcc skip
 	stz offset
-skip:	.)
+skip:
+	
+	cpy #75
+	bcc loop
+	.mend
+
+recolour_outside_boxes
+	.(
+	lda #<[outside_boxes+1]
+	sta pal_ptr
+	lda #>[outside_boxes+1]
+	sta pal_ptr+1
+	ldy #0
+loop
+	lda (pal_ptr),y
+	and #0b11110000
+	ora bg_colour
+	sta (pal_ptr),y
+
+	tya
+	clc
+	adc #5
+	tay
 	
 	cpy #75
 	bcc loop
 	rts
 	.)
 
-	; Called from IRQ, can't be context! Be careful with 'tmp' usage.
-set_hwscroll:
+recolour_big_boxes
 	.(
+	; Just using this as a random temp...
+	sta pal_ptr
+	lda outside_boxes+15*5+1
+	and #0b11110000
+	ora pal_ptr
+	sta outside_boxes+15*5+1
+	
+	lda inside_boxes+15*5+1
+	and #0b11110000
+	ora pal_ptr
+	sta inside_boxes+15*5+1
+	rts
+	.)
+
+	; Called from IRQ, can't be context! Be careful with 'tmp' usage.
+	.macro set_hwscroll
+
 	; tmp3 = start_addr / 8
 	lda start_addr+1
 	sta tmp3+1
@@ -840,16 +953,13 @@ set_hwscroll:
 	sta CRTC_ADDR
 	lda tmp+1
 	adc tmp3+1
-	.(
 	cmp #$80/8
 	bcc nowrap
 	clc
 	adc #>[[$3000-$8000]/8]
-nowrap:	.)
+nowrap:
 	sta CRTC_DATA
-	
-	rts
-	.)
+	.mend
 
 msg_scrstart
 	.word $6000 / 8
@@ -1470,6 +1580,8 @@ first_after_vsync
 	lda top_small_box_colour
 	beq inside_boxes
 
+	; WARNING: This label is used as an anchor to directly modify the
+	; immediates in the subsequent code.
 outside_boxes
 	lda #0b00000111 ^ 1 : sta PALCONTROL
 	lda #0b00010111 ^ 1 : sta PALCONTROL
@@ -1489,8 +1601,7 @@ outside_boxes
 	lda #0b11110111 ^ 0 : sta PALCONTROL
 	bra next_action_setup
 
-	; WARNING: This label is used as an anchor to directly modify the
-	; immediates in the subsequent code.
+	; WARNING: This one is too.
 inside_boxes
 	lda #0b00000111 ^ 3 : sta PALCONTROL
 	lda #0b00010111 ^ 3 : sta PALCONTROL
@@ -1598,7 +1709,7 @@ new_cycle_time
 	.word 64*8*5 - 64*2 + 18
 
 vsync_ctr
-	.byte 0
+	.word 0
 
 	; We control when vsync happens!
 vsync
@@ -1643,11 +1754,16 @@ vsync
 	sta USR_IER
 
 	inc vsync_ctr
+	.(
+	bne nohi
+	inc vsync_ctr+1
+nohi:	.)
+	
 	lda v_offset_usr
 	sta v_offset
 	
-	jsr horiz_scroll_bg_layer
-	jsr set_hwscroll
+	@horiz_scroll_bg_layer
+	@set_hwscroll
 	
 	lda #5
 	sta CRTC_ADDR

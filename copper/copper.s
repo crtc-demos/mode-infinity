@@ -1,6 +1,13 @@
 	.org $1200
 	
 	.temps $70..$7f
+
+	.macro crtc_write addr data
+	lda #%addr
+	sta CRTC_ADDR
+	lda %data
+	sta CRTC_DATA
+	.mend
 	
 entry_point:
 	.(
@@ -9,6 +16,7 @@ entry_point:
 	jsr mos_cursoroff
 	lda #BANK0
 	jsr select_sram
+	@crtc_write 6, {#1}
 	jsr fillscreen
 	jsr initvsync
 	.(
@@ -17,6 +25,23 @@ spin
 	cmp vsync_ours
 	beq spin
 	sta vsync_ours
+	
+	.(
+	inc blinds_ctr
+	lda blinds_ctr
+	cmp #5
+	bcc wait_a_bit
+	
+	@crtc_write 6, amount_open
+	lda amount_open
+	cmp #32
+	beq full_now
+	inc amount_open
+full_now:
+	stz blinds_ctr
+	
+wait_a_bit:
+	.)
 	
 	jsr music_poll
 
@@ -76,6 +101,11 @@ busy_wait
 
 nice_picture
 	.asc "owl3",13
+
+blinds_ctr:
+	.byte 0
+amount_open:
+	.byte 1
 
 curs1:
 	.word 0
