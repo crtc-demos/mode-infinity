@@ -14,7 +14,7 @@
     i:      .byte 18                               ; I
     j:      .byte 19,20,21                         ; J
     k:      .byte 15,16,22                         ; K
-    l:      .byte 23,24,25                         ; L
+    l:      .byte 23,20,25                         ; L
     m:      .byte 26,62,27,62,28                   ; M
     n:      .byte 26,62,28                         ; N
     o:      .byte 06,07,10                         ; O

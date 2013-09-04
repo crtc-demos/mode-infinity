@@ -343,7 +343,7 @@ final_pic
 	
 	.include "../lib/mos.s"
 	.include "../lib/cmp.s"
-	.include "../font/36font.s"
+	.include "../font/64font.s"
 	.include "../lib/vgmentry.s"
 	.include "../lib/load.s"
 	.include "../lib/sram.s"
@@ -1039,7 +1039,7 @@ nowrap:	.)
 	cpy #255
 	bne not_interchar_column
 	; The space column.
-	lda #36
+	lda #63
 	bra interchar_column
 not_interchar_column
 	lda (%tmp),y
@@ -1626,18 +1626,18 @@ mode_switch
 	sta ULACONTROL
 	lda #0b00000111 ^ 0 : sta PALCONTROL
 	lda #0b00010111 ^ 0 : sta PALCONTROL
-	lda #0b00100111 ^ 1 : sta PALCONTROL
-	lda #0b00110111 ^ 1 : sta PALCONTROL
+	lda #0b00100111 ^ 4 : sta PALCONTROL
+	lda #0b00110111 ^ 4 : sta PALCONTROL
 	lda #0b01000111 ^ 0 : sta PALCONTROL
 	lda #0b01010111 ^ 0 : sta PALCONTROL
-	lda #0b01100111 ^ 1 : sta PALCONTROL
-	lda #0b01110111 ^ 1 : sta PALCONTROL
-	lda #0b10000111 ^ 2 : sta PALCONTROL
-	lda #0b10010111 ^ 2 : sta PALCONTROL
+	lda #0b01100111 ^ 4 : sta PALCONTROL
+	lda #0b01110111 ^ 4 : sta PALCONTROL
+	lda #0b10000111 ^ 6 : sta PALCONTROL
+	lda #0b10010111 ^ 6 : sta PALCONTROL
 	lda #0b10100111 ^ 7 : sta PALCONTROL
 	lda #0b10110111 ^ 7 : sta PALCONTROL
-	lda #0b11000111 ^ 2 : sta PALCONTROL
-	lda #0b11010111 ^ 2 : sta PALCONTROL
+	lda #0b11000111 ^ 6 : sta PALCONTROL
+	lda #0b11010111 ^ 6 : sta PALCONTROL
 	lda #0b11100111 ^ 7 : sta PALCONTROL
 	lda #0b11110111 ^ 7 : sta PALCONTROL
 	lda ACCCON
