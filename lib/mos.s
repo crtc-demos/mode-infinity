@@ -42,6 +42,8 @@
 	
 	.alias ACCCON $fe34
 
+	.alias EVENTV $220
+
 	; The "notemps" directive says that these functions are safe to call
 	; from within a context. I.e., they use none of the automatically
 	; allocated temporaries.

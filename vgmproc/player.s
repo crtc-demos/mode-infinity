@@ -1,11 +1,13 @@
-	.org $e05
+	.org $e00
 	
-	.temps $63..$6f
+	.temps $50..$5f, $68..$6f
 header:
 	jmp initialize
 	jmp poll
 	jmp deinitialize
 	jmp copy_effect_from_shadow
+	jmp start_eventv
+	jmp stop_eventv
 
 	.alias tune $8000
 
@@ -46,21 +48,23 @@ deinitialize:
 	jsr select_old_lang
 	rts
 
+	.alias src $63
+	.alias dst $65
+	.alias tmp $67
+
 	; Copy A*256 bytes from $3000 to $1200. Entry with shadow bank in
 	; memory space.
-	.context copy_effect_from_shadow
-	.var2 src, dst
-	.var tmp
 copy_effect_from_shadow
+	.(
 	tax
 	lda #<$3000
-	sta %src
+	sta src
 	lda #>$3000
-	sta %src+1
+	sta src+1
 	lda #<$1200
-	sta %dst
+	sta dst
 	lda #>$1200
-	sta %dst+1
+	sta dst+1
 	ldy #0
 loop
 	; Get byte, maybe from shadow RAM...
@@ -69,8 +73,8 @@ loop
 	ora #4
 	sta ACCCON
 	cli
-	lda (%src),y
-	sta %tmp
+	lda (src),y
+	sta tmp
 
 	; Stick it back in normal RAM.
 	
@@ -80,13 +84,13 @@ loop
 	sta ACCCON
 	cli
 
-	lda %tmp
+	lda tmp
 	
-	sta (%dst),y
+	sta (dst),y
 	iny
 	bne loop
-	inc %src + 1
-	inc %dst + 1
+	inc src + 1
+	inc dst + 1
 	dex
 	bne loop
 	
@@ -97,7 +101,7 @@ loop
 	; Chain to next effect
 	jmp chain_next_effect
 	
-	.ctxend
+	.)
 
 	.include "../lib/mos.s"
 	.include "../lib/load.s"
@@ -174,38 +178,42 @@ tx18
 
 	; Input: A
 	; Output: A (lo), X (hi)
-	.context tx36
-	.var2 tmp, tmp2    
-tx36
-	; %tmp = <input>*4
-	stz %tmp+1
-	asl a
-	rol %tmp+1
-	asl a
-	rol %tmp+1
-	sta %tmp
+;	.context tx36
+;	.var2 tmp, tmp2    
+;tx36
+;	; %tmp = <input>*4
+;	stz %tmp+1
+;	asl a
+;	rol %tmp+1
+;	asl a
+;	rol %tmp+1
+;	sta %tmp
 	
 	; %tmp2 = <input>*32
-	ldx %tmp+1
-	stx %tmp2+1
-	asl a
-	rol %tmp2+1
-	asl a
-	rol %tmp2+1
-	asl a
-	rol %tmp2+1
+;	ldx %tmp+1
+;	stx %tmp2+1
+;	asl a
+;	rol %tmp2+1
+;	asl a
+;	rol %tmp2+1
+;	asl a
+;	rol %tmp2+1
 	
-	clc
-	adc %tmp
-	tay
-	lda %tmp2+1
-	adc %tmp
-	tax
-	tya
+;	clc
+;	adc %tmp
+;	tay
+;	lda %tmp2+1
+;	adc %tmp
+;	tax
+;	tya
 	
-	rts
-	.ctxend
+;	rts
+;	.ctxend
 
+	.alias PSG_STROBE_SEI_INSN psg_strobe
+	.alias PSG_STROBE_CLI_INSN psg_strobe + 23
+
+	; WARNING: sei/cli are removed temporarily when running from eventv.
 	.context psg_strobe
 psg_strobe:
 	sei
@@ -464,5 +472,73 @@ nohi:	.)
 	
 finished
 	.)
+	rts
+	.ctxend
+
+	.alias SEI_OP $78
+	.alias CLI_OP $58
+	.alias NOP_OP $ea
+
+old_eventv
+	.word 0
+old_rom
+	.byte 0
+
+	.context eventv_handler
+eventv_handler
+	php
+	cmp #4
+	bne not_vsync
+	pha
+	phx
+	phy
+	lda $f4
+	sta old_rom
+	lda #BANK0
+	sta $f4
+	sta $fe30
+	jsr poll
+	lda old_rom
+	sta $f4
+	sta $fe30
+	ply
+	plx
+	pla
+not_vsync
+	plp
+	rts
+	.ctxend
+
+	.context start_eventv
+start_eventv
+	lda #NOP_OP
+	sta PSG_STROBE_SEI_INSN
+	sta PSG_STROBE_CLI_INSN
+	
+	sei
+	lda #<eventv_handler
+	sta EVENTV
+	lda #>eventv_handler
+	sta EVENTV+1
+	cli
+	
+	; Enable VSYNC event.
+	lda #14
+	ldx #4
+	jsr osbyte
+	rts
+	.ctxend
+	
+	.context stop_eventv
+stop_eventv
+	; Disable VSYNC event.
+	lda #13
+	ldx #4
+	jsr osbyte
+
+	lda #SEI_OP
+	sta PSG_STROBE_SEI_INSN
+	lda #CLI_OP
+	sta PSG_STROBE_CLI_INSN
 	rts
 	.ctxend

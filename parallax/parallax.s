@@ -315,6 +315,7 @@ exit_effect
 
 	jsr deinit_effect
 	jsr music_deinitialize
+	jsr music_start_eventv
 
 	lda #1
 	jsr mos_setmode

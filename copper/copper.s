@@ -11,13 +11,19 @@
 	
 entry_point:
 	.(
+
 	lda #128
 	jsr mos_setmode
 	jsr mos_cursoroff
-	lda #BANK0
-	jsr select_sram
 	@crtc_write 6, {#1}
 	jsr fillscreen
+
+	; Hand music back over to manual polling.
+	jsr music_stop_eventv
+
+	lda #BANK0
+	jsr select_sram
+
 	jsr initvsync
 	.(
 spin
@@ -67,6 +73,8 @@ spin
 	.)
 	
 	jsr deinit_effect
+	jsr music_deinitialize
+	jsr music_start_eventv
 	
 	lda #1
 	jsr mos_setmode
@@ -90,11 +98,13 @@ spin
 	jsr select_old_lang
 	
 busy_wait
-	jsr music_poll
+	;jsr music_poll
 
 	lda #19
 	jsr osbyte
 	bra busy_wait
+	
+	jsr music_stop_eventv
 	
 	rts
 	.)
