@@ -1,0 +1,611 @@
+******************
+* XFER in C: TFM *
+******************
+
+
+Introduction
+============
+
+Welcome to XFer, a set of programs for the transfer of BBC files
+between a PC (running DOS or MS-Windows) and a BBC model B.
+
+What's the point of using XFer instead of other programs with similar
+functions?
+- The main advantage of XFer is that it *does* consider the file
+  attributes (load and exec addresses and locked attribute) of BBC files.
+  These file attributes are usually required to get a program to run.
+  Utilities like Kermit do not transfer these attributes. Therefore, if
+  you transfer a BBC file to a PC and then back to the Beeb, its
+  attributes get lost and you cannot run the program. XFer does
+  transfer these attributes (and stores them in additional files,
+  according to a standardized format).
+- It's got a terminal emulator that allows you operate your Beeb from
+  your PC.
+- It's fast (it approaches the theoretically obtainable speed of the Beeb's
+  hardware) and reliable (hand-shaking, CRC-checking and error reporting).
+- It's very easy to use: all operations are carried out on the PC and
+  results are shown at the PC side (including most BBC errors, like Disk
+  full).
+
+
+The rough stuff
+===============
+
+You are allowed to freely distribute these programs as long as:
+- you do not modify them;
+- you distribute all files (including text files) together;
+- you charge no money for them.
+
+The author has done his best to make the programs work correctly and he
+has witnessed several cases in which the programs worked as they should.
+He can, however, not guarantee the programs always work correctly. It is
+therefore your own responsibility to see to that you do not loose any
+data.
+
+
+System requirements
+===================
+
+You need:
+- A reasonably fast (386 or above) PC with MS-DOS or a compatible OS
+  (like Windows 3.1 or above) and at least 4 Megabytes of memory.
+- A BBC Model B with 32K of RAM, Basic II or above, a disk drive,
+  and preferably an Acorn DFS or a compatible DFS. (Some provisions
+  have been made for the program also to be compatible with other
+  DFSs--see the section about XFer.ini below.)
+
+
+Installation
+============
+
+You have already completed installation step 0: the unzipping of the
+archive.
+
+Step 1 concerns the making of a serial cable to connect your BBC and PC
+and the correct installation of this. See the file SerCable.txt for more
+information on this subject.
+
+If you have a BBC Master you should type *CONFIGURE DATA 5 at the BBC in
+order to set the number of data bits (8), the parity (none) and the
+number of stop bits (1). (BBC B's are usually configured properly
+already.)
+
+Step 2 concerns the editing of the file XFer.ini. This file contains the
+initialization options for XFer that should be set before you do
+anything else. Now edit this file as follows:
+- Leave the baud rate setting at 9600. (If you get many file
+  transfer errors later, lower it to 4800 or 2400.)
+- Set the COM port of the PC to the one you're using for file transfer.
+- Leave the time-out delay at its current setting. (If you get many
+  "connection timed out" errors later, increase the setting.)
+- If you have an Acorn-compatible DFS or a DFS that uses only
+  single-letter directory names, leave the option "directories" on (1). If
+  you have a DFS that allows for longer directory names (like ADFS), set
+  the option to off (0).
+- If you have an Acorn-compatible DFS or a DFS that produces *INFO
+  output that is similar to that of an Acorn DFS, leave the option
+  "wildcards" on (1). Otherwise (e.g. if you use ADFS) set the option to
+  off (0).
+If you find out the next steps cannot be performed properly, refer to
+the section about XFer.ini, which is below in this document.
+
+Step 3 concerns the transfer of XFer.bas (the BBC part of XFer) to
+the BBC. A program, 1stXFer, is included for this purpose. Run 1stXFer
+and follow the instructions given on screen. Three possible errors may
+occur at this time:
+- A typing error in the file XFer.ini. This will be reported to you and
+  you will have to edit XFer.ini.
+- The message "waiting for connection" remains on the screen for a long
+  time, to be followed by the text "connection timed out". The two most
+  likely reasons for this are. (a) you did not follow the instructions
+  given on screen; the solution is to do so. (b) you did not connect the
+  serial cable well (e.g. to the wrong COM port) or the serial cable is
+  no good. Read the section about troubleshooting below for more
+  information.
+- You get a lot of garbage on your BBC screen. In that case there
+  is probably something wrong with the serial port settings. If you have
+  a BBC Master, you may not have typed *CONFIGURE DATA 5. You may
+  also not have followed the instructions 1stXFer gave on screen.
+  A final reason can be that you plugged the serial cable the wrong
+  way round in your Beeb, your serial cable is too long, not shielded
+  well enough, or bad in other respects. Again, read the section about
+  troubleshooting below for more information.
+If all goes well, you will see XFer.bas being transferred to your BBC.
+This may take a while, as 1stXFer deliberately transfers XFer.bas to the
+BBC at a slow speed for reliability reasons.
+Save the program at the Beeb by typing SAVE "XFER".
+
+
+Operation
+=========
+
+To use the XFer you have to start programs at both the BBC and the
+PC. First type CHAIN "XFER" at the BBC and then type 'xfer' at the PC.
+
+The last two errors described above may occur. If an error occurs,
+take the actions described above. However, if all goes well, you will
+(quickly) see the options you entered in the file XFer.ini and the
+message "Waiting for connection", after which you are dropped in the
+main menu.
+
+The main menu gives you six options:
+
+     (R)eceive files from BBC          (S)end files to BBC
+     (*)-command on BBC                (D)os command on PC
+     (T)erminal emulation              (Q)uit
+
+You select an option by pressing the first letter of the option's name.
+
+
+Receive files from BBC
+----------------------
+
+After selecting this option, you are asked to enter a specification of
+the name(s) of the file(s) to be transferred. This is a specification of
+the file names as they are stored on the BBC disk. (Type *CAT in the
+main menu to view them.)
+
+If the option "wildcards" in the file XFer.ini is switched off, this
+specification should consist of the name of the (unique) file to be
+transferred.
+
+If the option "wildcards" is on, you may use the wildcard characters *
+and ? to specify multiple files. As in DOS, a * stands for multiple
+characters and a ? stands for a single character to be matched. However,
+unlike in (pre-version 7) DOS, a * does not match everything until the
+end of a file name, but only an (unspecified) number of characters.
+This gives you more control over which files should be transferred. For
+example, if the files FILE and FILE1 are on your disk, the spec F*1 in
+DOS matches both FILE and FILE1. In XFer, F*1 only matches FILE1.
+
+If the option "directories" in the file XFer.ini is switched off, the
+file specification cannot contain any references to directories. For
+example, you are not allowed to use R.FILE or $.FILE as file specs; only
+FILE is allowed; you have to change directories using the *DIR
+command.
+
+If the option "directories" is on, you may also type directory names as
+part of the file spec.
+
+Once you have entered the file specification, the specified files will
+be transferred. Each file will be stored in the current directory of
+your PC's hard disk under its BBC file name. (This current directory can
+be changed by selecting the option D from the main main and then CD to a
+new directory and finally typing exit to return to XFer). If, however,
+the BBC file name is not a legal DOS file name, it will be modified to
+make it legal. If there is already a file on your hard disk with the
+same name as XFer wants to use for storing the file, your are notified
+of this. You then have the option of continuing (the existing file is
+overwritten), aborting (the file transfer procedure for this file will
+be aborted), or renaming the file you wish to transfer.
+
+In addition, for every BBC file a file is created that has the same
+name as the base file, but the extension .INF, in which information
+about the BBC file's attributes is stored. (See the document
+Format.txt for more information about the .INF files.)
+
+You can interrupt the file transmission by pressing ESCAPE. The file
+transmission is then stopped after the current file has been
+transferred. (Due to efficiency reasons file transfer cannot be stopped
+in the middle of the transmission of a file.)
+
+After a file has been transmitted, a check takes place whether the file
+has been transmitted correctly, i.e. if no bits were changed during
+their travel. If all went well, the next file (if there is one) will be
+transferred. If, however, the file was not transferred correctly, the
+error message "Error during file transfer. Please try again" is shown
+and no more files will be transferred. You should try to transfer the
+file(s) again.
+
+It is normal for transmission errors to occur once in a while, due to
+electromagnetic influences on the serial cable. If, however, these errors
+occur often, read the section about the file XFer.ini. Also, if you
+get a "connection timed out" error, read this section.
+
+When all files have been transferred, you are dropped back in the main
+menu.
+
+
+Send files to BBC
+-----------------
+
+Again you are asked to enter a file spec. This is a specification of the
+file names as they are stored on your PC's hard disk. This file spec may
+include the name of the directory in which the file(s) is (are) stored.
+(e.g. C:\TRASH\*MUMMY). If you do not include a directory name, the
+file(s) will be sent from the current directory.
+
+You are allowed to use the wildcards * and ?, regardless of the setting
+of the parameter "wildcards" in the file XFer.ini. This time the
+wildcards have their standard (pre-version 7) DOS meaning.
+
+The selected files will be sent to the BBC, where they are stored on
+disk. If a file that is transferred has an associated .INF file, the
+file attributes will be set on the BBC disk as specified in the .INF
+file. The file name on the BBC disk will be set as specified in this
+.INF file. If there is no associated .INF file, XFer assumes you are
+sending a text file; the load and exec attributes of the file are set to
+0 and the Locked attribute is switched off.
+
+(Files with the extension .INF are never sent to the BBC, because they
+are assumed to be files with attribute information.)
+
+After the transfer of a file a check takes place whether it was
+transferred correctly. If this was not the case, sending of further
+files is stopped, and the error message "Error during file transfer.
+Please try again" is shown.
+
+You can again stop the transfer of files after the current file by
+pressing ESCAPE.
+
+Various errors may occur during the sending of files. Most of them
+should be reported at the PC and stop file transfer. Some of the
+possible errors:
+- File locked: you are trying to send a file that is already present
+  on the disk and has its locked attribute set. Solution: type *ACCESS
+  <filename> to unlock the file.
+- Disk full: pretty obvious. Delete files from the disk or use another
+  disk.
+- Can't extend: a nasty one, that is caused by the way in which the BBC
+  stores its files on a disk. One solution is to *COMPACT the disk. (If
+  you do so: be careful, because *COMPACT may use all of the Beeb's
+  memory, thus destroying any programs in it.) Another one is to use a
+  new disk.
+
+
+*-command on BBC
+----------------
+
+This option allows you to carry out a *-command on your BBC. The results
+are shown on the PC's screen.
+
+Be careful not to type *-commands that destroy the Beeb's memory
+contents (like *COMPACT or *RUNning a file).
+
+Also, do not type any *-commands that take very long to process. (If
+you do so, and the PC doesn't hear anything from your Beeb, the PC
+assumes its connection with the Beeb has been broken and you get a
+"connection timed out" error.) Similarly, do not enter any *-commands
+that require you to type more things afterwards, because XFer doesn't
+give you that chance. If you wish to carry out one of these types of *-
+commands, first switch to the terminal emulator and then issue the
+command.
+
+
+Dos command on PC
+-----------------
+
+This option temporarily throws you into the wild world of Bill Gates.
+This is for example useful to change the current directory (cd), in
+which XFer stores its files and from which it gets them. It is also
+useful to ask for a directory listing (dir).
+
+You return to XFer by typing EXIT.
+
+
+Terminal emulation
+------------------
+
+Selecting this option drops you in terminal emulation mode. This allows
+you to control your BBC from your PC, pretty much as if you were sitting
+behind your Beeb. You return to the main menu by pressing F1 at the PC.
+
+You should realize that, although the Beeb has quit XFer (the PC hasn't)
+and you can type pretty much whatever you want, XFer is still in the
+Beeb's memory. Therefore, if you wish to continue transferring files
+when you're in the main menu again, you should not type in terminal
+emulation mode any commands that destroy XFer or its compiled machine
+code in the Beeb's memory. So, if you want to continue transferring files,
+don't e.g. type NEW (which destroys the program in memory) and don't
+declare variables (which may destroy the machine code). The main use of
+the terminal emulator is then that it allows you to carry out *-commands
+that take a long time to process or that require you to provide input.
+
+If you don't want to continue transferring files and wish to use the
+terminal emulator on its own, for example to edit your own files, you
+are free to type the above commands. You should know that *FX 2,0 stops
+the Beeb accepting input from the PC and *FX 3,0 stops the Beeb's output
+to the PC.
+
+The terminal emulator allows you to control your Beeb in most respects
+as if you were sitting behind a Beeb. There are a few differences:
+
+- There is a copying system similar to the Beeb. The cursor keys work
+  as on a Beeb. To copy what's under the current cursor, use the END
+  key instead of the COPY key, as a PC has no COPY key.
+
+- The DELETE key works as on the Beeb. The DELETE key, however, only
+  works when you're in editing mode, i.e. when you directly see appear on
+  screen what you type. For example, if you type LIST, the listing will
+  scroll over your screen and you're not in editing mode. To make the
+  difference clear: If you type ABC directly on a Beeb when the listing is
+  scrolling and then press DELETE three times, the end result on the Beeb
+  would be that you see nothing when the listing is finished. However,
+  because in the terminal emulator the DELETE key doesn't work when you're
+  not in editing mode, the terminal emulator will still show you ABC.
+# The technical reason for this is that a Beeb does not transfer a
+# delete character, chr(127), to the PC via its RS 424--don't ask me why;
+# it doesn't. Therefore the handling of the effect of pressing DELETE is
+# done locally at the PC, by making the cursor go back 1 place, printing
+# a space, and making the cursor go back again. This has, however, only
+# the desired effect when you're in editing mode.
+#
+# XFer has a known feature (or bug, as you might call it) that you
+# will encounter only in very specific circumstances and that will not
+# normally cause any problems: if, in terminal emulation mode, you enter
+# a *-command or run a program that requires you to provide input, you may
+# be able to to delete characters that you weren't able to delete on a
+# real Beeb. For example, if you type *WIPE * and then press the Y key
+# five times in order to delete five files, you may delete five characters
+# after the *WIPE command has finished. (So you may be able to delete the >
+# character that denotes you are in editing mode again after the the execution
+# of the *-command.)
+# The technical reason for this is, again, that the pressing of the DELETE
+# key is handled locally at the PC (due to reasons stated above). XFer
+# therfore only thinks that you're editing a new line if you explicitly press
+# the RETURN key. So if, like in the above example, you press during the
+# execution of the *WIPE * command five keys (Y keys or N keys, but not a
+# RETURN key) and the Beeb has put you in editing mode again afterwards,
+# XFer will assume you have pressed five keys *after* had entered the
+# *WIPE command.
+   
+- A mechanism similar to the Beeb's CTRL-N/CTRL-O has been implemented.
+  The difference with a Beeb is the following. When you're in page mode on
+  a Beeb (CTRL-N), the Beeb only stops output every page if you enter a
+  command that produces output that is more than one page long (e.g. LIST
+  or *CAT). The terminal emulator *always* stops output after one page,
+  also when you're in editing mode. For example, pressing RETURN 25 times
+  requires you to press SHIFT to continue.
+# The technical reason for this is that there is no (easy) way for the
+# terminal emulator to know whether you're in editing mode or not.
+# Therefore it decides to play safe and to always suspend output after a
+# full screen has been printed.
+  
+- If you press the ESCAPE key while the Beeb is sending output, the last
+  few lines of this output may get corrupted. For example, if you press
+  ESCAPE during the listing of a file, the last (few) line(s) may get
+  corrupted.
+# The technical reason for this is that the Beeb empties its RS423
+# output buffer, that may contain part of these lines, when it receives
+# an escape character.
+
+
+XFer.ini
+========
+
+The file XFer.ini contains the initialization options for XFer and
+1stXFer.
+
+The format of the contents of the file XFer.ini is as follows ([a|b|c]
+means either a, or b, or c):
+
+baudrate=[1200|2400|4800|9600]
+comport=[1|2]
+timeoutdelay=<integer between 0 and 32767>
+directories=[0|1]
+wildcards=[0|1]
+
+This format is very strict: the options must be in the specified order
+and additional spaces are not allowed.
+
+The meanings of the options are as follows:
+
+baudrate
+--------
+
+This is the number of bits that are transferred per second. It may have
+the values 1200, 2400, 4800, or 9600. 
+
+Its initial value is 9600. In most cases this should be all right.
+However, for some systems this may be too fast (for example because of a
+serial cable that is not shielded well enough, a very long serial cable,
+or a serial port controller that doesn't work as it should). When
+running XFer, this becomes apparent if you get many file transfer
+errors, or if the PC and the BBC appear to communicate in strange ways
+(e.g. you give the PC a *-command and the Beeb wants to transfer a file;
+or the Beeb continually complains "invalid data received" after it first
+talked to the PC). In those cases you should try to lower the baud rate.
+
+# In theory a Beeb should also be able to communicate at 19200 baud.
+# However, in practice this speed can never be attained because of the
+# following reasons:
+# 1. The Beeb's serial port controller is often unreliable at this
+#    speed.
+# 2. The Beeb can never keep up with a sending or receiving speed of
+#    19200 baud, simply because its processor isn't fast enough. For
+#    example, even though all critical parts in XFer have been 
+#    implemented in machine code, the effective baud rate you get when
+#    you have selected 9600 baud is only about 8000 baud.
+# Regarding point 2: XFer approaches the theoretical transmisssion
+# speed of 9600 baud: it can achieve around 8000 baud during transmission
+# over a serial cable. The reason 9600 baud isn't attainable is simply
+# that the Beeb's processor is fast enough to keep up with 9600 baud.
+# Moreover, the speed of XFer is not so much determined by the
+# serial port controller, but by the speed of the Beeb's disk drive (which
+# usually limits the overall transfer speed much more than the serial
+# port controller).
+
+comport
+-------
+
+This option should be set to the number of the comport you're using (1
+for COM1, 2 for COM2).
+
+If you don't set the comport right, the Beeb and the PC will not be able
+to communicate; you will get a "connection timed out" error quite soon
+after starting XFer or 1stXFer.
+
+timeoutdelay
+------------
+
+This option represents the number of hundreds of seconds the PC waits
+for the BBC during data transfer before it concludes something is wrong
+with the connection with the BBC (and gives a "connection timed out"
+error).
+
+You should first try the initial value of 1000, which means that the PC
+waits at most 10 seconds for the Beeb. 
+
+# This may seem a long time, but the Beeb's disk operations can be
+# extremely slow. They are especially slow during save operations. That is
+# why the time-out delay is doubled by XFer during save operations: on
+# the author's Beeb with DFS 2.0 an OPENOUT command can easily take 15
+# seconds on a disc that is scattered with files!
+
+directories
+-----------
+
+This option controls how XFer handles directories. A 1 means normal
+(Acorn DFS-compatible) directory handling, a 0 means that only the
+current directory is considered.
+
+"Normal" directory handling assumes
+- directory names of only a single character that are separated from
+  the file names by a dot;
+- that it is possible to OPENIN or OPENOUT files that are not in the
+  current directory (e.g. if the current directory is $, the command
+  f=OPENOUT("R.FILE") should be allowed).
+  
+If your DFS conforms to these two demands (all Acorn DFSs I have tested
+XFer with--1.2 and 2.0--do), you can set the directories option to
+1. Otherwise, you have to set it to 0 (this is e.g. the case for most
+hierarchical DFSs, like ADFS).
+
+If you set this option to 1, this has the following consequences:
+- When retrieving a file from the BBC you can use directory names in a
+  file specification. You may e.g. type R.FILE to get the file FILE from
+  directory R, even though $ may be the current directory. The directory
+  name of the file is always stored in the associated .INF file on the PC,
+  even if you get a file from the current directory and do not specify the
+  directory name.
+- When sending a file to the BBC, the file is put in the directory
+  specified in the associated .INF file. For example, if you send the
+  file FILE to the BBC, and the file FILE.INF contains as the <filename>
+  entry R.FILE, the file is saved in directory R.
+  
+If you set this option to 0, this has the following consequences:
+- When retrieving a file from the BBC you are not allowed to use
+  directory names in a file specification. You may e.g. not type R.FILE,
+  not even if R is the current directory. The directory name of the file
+  is never stored in the associated .INF file on the PC.
+- When sending a file to the BBC, the file is always put in the current
+  directory; the directory name specified in the associated .INF file on
+  the PC is ignored.
+
+wildcards
+---------
+
+This option controls whether you can use wildcards when retrieving a
+file from the BBC. (You can always use wildcards when sending a file to
+the BBC.) A 1 means that the wildcards * and ? can be used for selecting
+files; a 0 means they cannot be used.
+
+You might think it is always useful to be able to use wildcards, so that
+the option should always be on. Unfortunately this is not true, due to
+the way the wildcard mechanism has been implemented for receiving files:
+it depends on the output of the *INFO command on the Beeb.
+
+# What happens is that if the wildcards options is switched on, the PC
+# asks the Beeb to send over the output of a *INFO *.* command (if the
+# directories option is on) or a *INFO * command (if the directories
+# option is off). The PC then processes this output to determine which
+# file names match the file specification. (This happens even when you
+# don't use any wildcard characters in the file specification, because
+# this is also an easy way to find out whether the specified file
+# exists.) The consequence of this is that the mechanism depends heavily
+# on what output a *INFO command exactly produces.
+
+If the *INFO command of your DFS produces output that is "compatible"
+with that of Acorn DFSs, you can set the wildcards option to 1. However,
+if it doesn't, you should set it to 0. I cannot specify exactly what
+"compatible" is, but I can give a number of examples of non-
+compatibility:
+- the *INFO command produces header or footer lines that Acorn DFSs do
+  not produce, for example the number of free sectors;
+- the *INFO command displays the file names and their attributes on
+  different lines (like HDFS does);
+- the *INFO * command does not only display all files in the current
+  directory, but also directories (like ADFS does; if for example you
+  have the wildcards option switched on and you type (R)eceive ?, and
+  there is a directory called D, XFer will try to open a file D on
+  the BBC; I don't know what the consequences of this are--a crash or
+  a normal error message--but if you want to try, please do and let me
+  know what the results are).
+
+
+Troubleshooting
+===============
+
+THE SINGLE MOST REASON OF PROBLEMS IS A FAULTY SERIAL CABLE. PLEASE READ
+THE FILE SERCABLE.TXT WELL. Even if you have a serial cable that works
+with e.g. Windows Terminal and your Beeb, this does not mean it will
+also work with XFer. For reliability XFer uses handshaking and this
+requires a more advanced cable.
+
+If you have a non-Acorn DFS (or an Acorn ADFS), and you experience one of
+the problems described in the section about XFer.ini, set the options
+"directories" and "wildcards" in the file XFer.ini to 0.
+
+If you get many "connection timed out" errors, refer to the items
+"comport" and "timeoutdelay" in the section about XFer.ini.
+
+If you get many "Error during file transfer" errors, refer to the item
+"baudrate" in the section about XFer.ini.
+
+If you are using Windows 95 (or another multitasking operating system),
+and suddenly your Beeb and your PC don't seem to communicate (anymore),
+this may be caused by multiple programs having claimed (or using) the
+serial port of your PC. For example, if you run XFer in one DOS box,
+quit it, open another DOS box and run XFer in it again, the serial
+port is still claimed by the first DOS box. Consequently, the second
+time you run XFer, it will not be able to communicate with your PC.
+If you're lucky, you will just have to shut the first DOS box. However,
+there are circumstances in which you'll have to re-start Windows95.
+
+If you seem to do everything well and the Beeb and the PC appear to
+communicate in some way, but you still get many errors, there may be a
+number of causes, like:
+- you have a non-shielded serial cable (use a shielded one);
+- your serial cable is too long (make it shorter; I don't know exactly
+  how long it can be, but I use one of 4 meters without many problems);
+- you did not connect the handshaking pins of the Beeb and the PC well
+  (see the file SerCable.txt);
+- you plugged the serial cable in your Beeb the wrong way round (see the
+  file Sercable.txt);
+- your Beeb's serial port controller isn't initialized properly; on a
+  BBC Master type *CONFIGURE DATA 5 to set the number of data bits to 8,
+  parity to none and the number of stop bits to 1. (This cause is extremely
+  unlikely to happen on a BBC B; if it occurs, however, you can initialize
+  the Beeb's serial port controller using *FX 156,20,235.)
+- your Beeb or your PC has a broken serial port controller (find out by
+  trying a different Beeb and/or PC).
+If nothing helps, try your serial cable with other programs (like
+Kermit, or make a very simple terminal emulator on the Beeb with *FX 2
+and *FX 3 and use a terminal emulator like MS-Window's 3.1 terminal
+program on the PC).
+  
+If you seem to do everything well and the Beeb and the PC appear not to
+communicate at all, you're in trouble. Consider the above reasons. In
+addition there may be some other reasons:
+- the com port specified in XFer.ini is not the one the serial cable is
+  connected to;
+- you have inserted the serial cable plug in the BBC the wrong way (see
+  the file SerCable.txt);
+- something went wrong in the construction of the serial cable; review
+  whether you really connected the right pins; test whether the serial
+  cable actually transfers any signals (e.g. with a battery and a lamp);
+  if it does, test it with a simple terminal program (e.g. the Windows 
+  3.1 terminal program) on the PC and *FX 2 / *FX 3 on the BBC.
+Note: it is possible for your serial cable to work with a simple
+terminal setup with e.g. Windows 3.1 terminal program on the PC and
+*FX 2 / *FX3 on the BBC, and not to work with XFer. The reason is that
+the Windows 3.1 terminal program can do with a simpler cable than XFer
+(because the Windows terminal omits certain reliability checks.) See the
+file SerCable.txt for more information.
+  
+If you seem to do everything well and the programs usually work well,
+but now and then they lock up or give unexpected error messages, you may
+have discovered a bug. Please let me know about it. See the file
+ReadMe.1st about reporting errors.
+
+$Id: XFerInC.txt,v 1.1 1999/11/04 09:21:16 angus Exp $

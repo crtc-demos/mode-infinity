@@ -60,6 +60,15 @@ pushd vgmproc
 ./compile.sh
 popd
 
+pushd tmpdisk
+for x in *.inf; do
+  read name base run < $x
+  basename=$(basename $x .inf)
+  size=$(wc -c $basename | awk '{print $1}')
+  echo $name $base $run $(printf "%x" $size) RWX > $x
+done
+popd
+
 $BBCIM -new demodisk.ssd
 pushd tmpdisk
 $BBCIM -a ../demodisk.ssd *

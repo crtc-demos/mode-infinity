@@ -1,0 +1,10 @@
+# $Id: dotxfer,v 1.1 1999/11/07 00:35:51 angus Exp $
+# Example XFer dot file. Alter to suit your DFS and baud rate, and copy to
+# ~/.xfer.
+baudrate 19200
+timeoutdelay 1000
+wildcards on
+directories on
+handshake dsr_dtr
+# The location of the BBC program can be set with the "basic" directive:
+#basic /usr/local/etc/xfer.bas

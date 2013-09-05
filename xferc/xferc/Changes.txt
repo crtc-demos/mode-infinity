@@ -1,0 +1,100 @@
+$Id: Changes.txt,v 1.1 1999/11/04 09:21:16 angus Exp $
+
+XFer in C Version 4.0
+=====================
+
+- Complete rewrite for Win32 (Windows 95/98/NT/2000) and Linux in C
+  * Open source
+  * Support for disc image downloading
+  * Use of OSFILE to read file attributes
+  * Extended .inf file format for file attributes
+  * Improved CRC support
+  * Support for recursive directory downloading
+  * Support for multi-format disc filing systems (HDFS)
+
+XFer Version 3.0
+================
+
+- Program now handles disk boot option (*OPT 4) parameter
+  * When transferring an !BOOT file from a BBC to a PC, the disk
+    boot option parameter is added to the !BOOT.INF file.
+  * When transferring an !BOOT file from a PC to a BBC, while the
+    !BOOT.INF file contains a boot option parameter, the correct
+    boot option is set on the BBC disk.
+  * See file FORMAT.TXT for explanation of syntax of !BOOT.INF.
+  * (Note: boot option is transferred for every !BOOT file, even
+    "non-bootable" !BOOT files, such as !BOOT files in directories
+    other than $.)
+
+
+XFer Version 2.3
+================
+
+- Bug fix
+  * program crashing when transferring files with length of exact
+    multiple of 4,000 bytes (4,000 bytes is BBC buffer size)
+- More documentation on troubleshooting.
+
+
+XFer Version 2.2
+================
+
+- Bug fix
+  * program unable to transfer first file in BBC *INFO list if option
+    "wildcards" turned on.
+- More documentation on troubleshooting.
+
+
+XFer Version 2.1
+================
+
+- Bug fix
+  * program crashing when trying to transfer files from empty disks.
+- Program renamed to XFer.
+
+
+BBCXFer Version 2
+=================
+
+- Bug fixes:
+  * program crashing when transferring 0-byte files;
+  * no re-checking for existing file name (to prevent overwriting existing
+    files) after incoming file has already been renamed.
+- Improved instructions for making program work with non-standard DFSs
+  and BBC Master.
+- Added instructions on how to prevent problems when running BBCXFer
+  under Windows95.
+- Program confirmed to work with Acorn ADFS, many other DDFSs, and
+  on BBC Master.
+
+
+BBCXFer Version 1 (First Public Release)
+========================================
+
+No modifications
+
+
+BBCXFer version Beta 2
+======================
+
+- Bug fixes:
+  * terminal emulator crashing in very specific circumstances;
+  * program deadlocking after sending 17 files in a row to the BBC
+    (was a pretty hard one!);
+  * receiving files impossible without option "wildcards" set to off
+    with standard Acorn DFS (it should only be necessary to set the option
+    "wildcards" to off when using a DFS that is not compatible with a
+    standard Acorn DFS).
+- Improved instructions for making serial cable in case 25 pin PC port
+  is used.
+- Modified name of "image format for storing BBC files on other computers"
+  to "standard format for storing BBC files on other computers" in all
+  documents.
+- Improved description of standard format for storing BBC files on other
+  computers.
+
+
+BBCXFer version Beta 1
+======================
+
+First beta version

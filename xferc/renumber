@@ -1,0 +1,14 @@
+#!/usr/local/bin/perl -i.bak
+#
+# $Id: renumber,v 1.1 1999/11/04 09:21:16 angus Exp $
+#
+# Perl Script to renumber ASCII version of xfer.bas program. This is NOT a
+# general BASIC RENUMBER program. It only works because xfer.bas does not use
+# GOTO, GOSUB, or any other line-number reference.
+
+$line = 0 ;
+
+while ( <> ) {
+  s/^\s*\d+/sprintf("%5d",$line += 10)/e ;
+  print ;
+}

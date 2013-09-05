@@ -1,0 +1,149 @@
+***********************************************************
+* HOW TO MAKE A SERIAL CABLE FOR BBC <-> PC FILE TRANSFER *
+***********************************************************
+
+
+Ingredients
+===========
+
+- shielded cable with at least four wires; length depending on needs, up to
+  many meters
+- 5-pin Domino DIN-plug (you might have to shop around for this item; they're
+  not that common anymore)
+- 9-pin D-type plug or 25-Pin D-type plug, depending on your PC's serial
+  port(s)
+
+
+Recipe
+======
+
+Make the following connections:
+
+Pin   Pin
+(9 P) (25 P)    PC                              BBC           Pin
+----- ------    --                              ---           ---
+ 5     7        0V (Ground)                     Gnd (Ground)   1
+ 2     3        RxD (Data in)   --------------  TD (Data out)  2
+ 3     2        TxD (Data out)  --------------  RD (Data in)   3
+ 1     8        DCD             ---+----------  RTS            5
+ 6     6        DSR             ---+
+ 4     20       DTR             --------------  CTS            4
+ 7     4        RTS             ---+
+ 8     5        CTS             ---+
+
+(The +'s mean that locally on the PC DSR has to be connected to DCD and that
+RTS has to be connected to CTS.)
+
+
+Pin numbering
+-------------
+
+PC:                                           BBC:
+9-pin D-type       or: 25-pin D-type          5-pin Domino DIN-plug
+                                              (male)
+_____________      _______________________      _____ 
+\ 1 2 3 4 5 /      \ 1  2 .  .  .  .  13 /     /     \
+ \ 6 7 8 9 /        \ 14 15 .  .  .  25 /     / 5   3 \
+  ---------          -------------------      |   1    |
+                                              \ 4   2 /
+                                               \     /
+                                                -----
+
+The views of these figures are all from the outside (the backs of the
+computers) into the sockets, i.e. they show the wiring sides of the plugs.
+
+
+Some tips
+=========
+
+If you plan to wire up your BBC to a PC, you might learn from what I
+have done wrong:
+
+- You can insert the BBC-plug into the RS423 port in two ways. Do it
+  the right way! (A handy tip I received is to put some Tippex on the
+  top of the plug.)
+- Find out which PC's RS232 port is COM1 and which one is COM2. I thought
+  COM1 is always the 9-pin socket and COM2 always the 25-pin socket, but
+  on the PC I used it was exactly the other way round! (Btw. Does anyone
+  know of an easy way to find this out?)
+
+
+# The Theory
+# ==========
+#
+# It will be clear that the Beeb's Data-In has to be connected to the
+# PC's Data-Out and vice versa.
+#
+# It is more complex with the other connections. These are meant for the
+# hand-shaking between the Beeb and the PC. This basically means that the
+# Beeb and the PC can tell each other when they are ready to send/receive
+# data. A handshaking mechanism prevents one of the computers to send,
+# when the other one isn't ready to receive, in which case data would get lost.
+#
+# The reason for the unclarity of the handshaking pins, and also the reason
+# why there appeared to be two "schools" of people on how to connect a Beeb
+# and a PC during a recent discussion on the BBC-mailing list, is two-fold:
+# 
+# - the RS423 and the RS232 are only *interfaces*. An
+#   interface definition only defines the *local* aspects of an
+#   interconnection between the computers and not the *remote* aspects.
+#   (Both the local and remote aspects together form the communication 
+#   *protocol*, which is the important thing in our case. For a good
+#   treatise on interfaces and protocols read "The design of Telematics
+#   Systems" by C. Vissers who is my PhD supervisor :)
+# - the RS232 interface definition (CCITT V.40 or V.42, I believe) is just
+#   plain bad (its definitions of the functions of the pins are ambiguous).
+# 
+# If the above sounds a bit too theoretical to you: the problem is that
+# you have a lot of freedom in connecting the pins, depending on the
+# communication protocol you use. 
+# 
+# On the Beeb the above is not much a problem, because the RS423 is very
+# simple: if the Beeb wants to send it raises its RTS signal and waits
+# until its CTS signal is raised by the other computer; for receiving it's
+# the other way round. 
+# 
+# However, the RS232 of a PC is more complex. Its definition suggests (but
+# not necessarily prescribes) that the DTR pin has a function similar to
+# the Beeb's RTS pin and the DSR pin a function similar to the Beeb's CTS
+# pin. Most protocols implemented on the PC (and all I tried) adhere to
+# this. This is why you have to connect the Beeb's RTS to the PC's DSR and
+# the Beeb's CTS to the PC's DSR. 
+# 
+# But things are more complex. The RS232 also has a DCD (data carrier
+# detect) pin, which can be used to detect if there is a device connected
+# to it. Most (but not all) protocols implemented on a PC use this. As
+# the Beeb has no complementary signal, a "circumvention" is needed. The
+# easiest way to circumvent this is to connect this pin to the PC's DSR
+# pin, so that every time it receives a DSR-signal, the PC automatically
+# knows there is also a device connected. 
+# 
+# To make things even more complex, the RS232 also has an RTS and a CTS
+# pin, albeit with different functions than on a Beeb. Some protocols
+# implemented on the PC use these for a second handshake after the
+# handshake with DTR/DSR/DCD. (Don't ask me what it is good for.) The
+# easiest way to circumvent this, is to connect the PC's RTS pin simply
+# to its own CTS pin.
+# 
+# If you want to experiment with the different types of handshaking
+# described above: it is easy to do so with QBASIC (included in MS-DOS
+# versions 5 to 6.20, I think). Look at the help item for "OPEN COM".
+# 
+# 
+# To conclude
+# ===========
+# 
+# - The wiring required for the handshake depends on the protocol you use.
+# - Nearly all protocols implemented on the PC treat the DTR pin as the
+#   Beeb's RTS pin and the PC's DSR pin as the Beeb's CTS pin; so you need
+#   to cross-wire these.
+#   (To the people who think RTS/CTS should be cross-wired on both computers:
+#   I'm not saying you were wrong or that your suggestion will never work;
+#   however, if it works for you you're using a pretty esoteric protocol
+#   and it will probably not work with most other protocols.)
+# - Many protocols implemented on the PC also wait for a DCD signal during
+#   handshake; therefore it's useful to connect DCD to DSR on the PC.
+# - Some protocols use a second hand-shake. In order to "circumvent" this, 
+#   connect the PC's RTS pin to its CTS pin.
+
+$Id: SerCable.txt,v 1.1 1999/11/04 09:21:16 angus Exp $
