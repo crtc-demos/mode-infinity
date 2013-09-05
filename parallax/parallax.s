@@ -1672,7 +1672,7 @@ disable_irq
 	;@crtc_write 6, {#displayed_lines-top_screen_lines}
 	@crtc_write 6, {#2}
 	;@crtc_write 7, {#total_lines-top_screen_lines-4}
-	@crtc_write 7, {#5}
+	@crtc_write 7, {#4}
 
 	;lda #0b00000111 ^ 6 : sta PALCONTROL
 	;lda #0b00010111 ^ 6 : sta PALCONTROL
@@ -1707,7 +1707,7 @@ exit_timer1:
 	rti
 
 new_cycle_time
-	.word 64*8*5 - 64*2 + 18
+	.word 64*8*5 + 64*8 - 64*2 + 18
 
 vsync_ctr
 	.word 0
