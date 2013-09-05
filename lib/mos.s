@@ -4,6 +4,7 @@
 	.alias osfind $ffce
 	.alias osgbpb $ffd1
 	.alias osfile $ffdd
+	.alias osword $fff1
 	.alias oscli $fff7
 
 	.alias CRTC_ADDR $fe00
@@ -47,7 +48,7 @@
 	; The "notemps" directive says that these functions are safe to call
 	; from within a context. I.e., they use none of the automatically
 	; allocated temporaries.
-	.notemps oswrch, osbyte, osfind, osgbpb, osfile, osasci
+	.notemps oswrch, osbyte, osfind, osgbpb, osfile, osword, osasci
 
 	; Set graphics mode to A.
 mos_setmode:

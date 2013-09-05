@@ -79,6 +79,8 @@ spin
 	lda #1
 	jsr mos_setmode
 	jsr mos_cursoroff
+	lda #0
+	jsr end_pic_fade
 	
 	;@load_file_to nice_picture, $3000
 	lda #<$8000
@@ -97,17 +99,115 @@ spin
 	
 	jsr select_old_lang
 	
+	lda #0
+fade_in
+	pha
+	jsr end_pic_fade
+	
+	.(
+	ldx #10
+loop
+	phx
+	lda #19
+	jsr osbyte
+	plx
+	dex
+	bne loop
+	.)
+	
+	pla
+	inc a
+	cmp #6
+	bne fade_in
+	
 busy_wait
 	;jsr music_poll
 
 	lda #19
 	jsr osbyte
-	bra busy_wait
+	
+	sei
+	lda music_playpos
+	sta my_playpos_copy
+	lda music_playpos+1
+	sta my_playpos_copy+1
+	cli
+	
+	@if_ltu_imm my_playpos_copy, $b53c, busy_wait
+
+	lda #5
+fade_out
+	pha
+	jsr end_pic_fade
+	
+	.(
+	lda #10
+loop
+	phx
+	lda #19
+	jsr osbyte
+	plx
+	dex
+	bne loop
+	.)
+	
+	pla
+	dec a
+	cmp #255
+	bne fade_out	
 	
 	jsr music_stop_eventv
 	
+	lda #7
+	jsr mos_setmode
+	
 	rts
 	.)
+
+my_playpos_copy
+	.word 0
+
+	.context end_pic_fade
+end_pic_fade
+	asl
+	asl
+	tax
+	ldy #0
+loop
+	sty param_block
+	lda fade_pals,x
+	sta param_block+1
+	phx
+	phy
+	lda #12
+	ldx #<param_block
+	ldy #>param_block
+	jsr osword
+	ply
+	plx
+	inx
+	iny
+	cpy #4
+	bne loop
+
+	rts
+
+param_block
+	.byte 0
+	.byte 0
+	.byte 0
+	.byte 0
+	.byte 0
+
+	.ctxend
+
+fade_pals
+	.byte 0,0,0,0
+	.byte 0,0,0,4
+	.byte 0,0,4,1
+	.byte 0,0,1,2
+	.byte 0,4,2,3
+	.byte 0,1,3,7
 
 nice_picture
 	.asc "owl3",13
@@ -211,6 +311,7 @@ swap:
 	.include "../lib/sram.s"
 	.include "../lib/load.s"
 	.include "../lib/srambanks.s"
+	.include "../lib/cmp.s"
 
 	.context fillscreen
 	.var2 ptr
