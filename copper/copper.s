@@ -160,6 +160,11 @@ loop
 	
 	lda #7
 	jsr mos_setmode
+	jsr mos_cursoroff
+		
+	jsr plot_end_banner
+loop_forever
+	jmp loop_forever
 	
 	rts
 	.)
@@ -640,6 +645,40 @@ nohi:	.)
 	sty PALCONTROL				    ; P
 	jmp done_palette
 	.mend
+
+	.context plot_end_banner
+	.var2 src, dst
+plot_end_banner
+	lda #<endpic_bytes
+	sta %src
+	lda #>endpic_bytes
+	sta %src+1
+	
+	lda #<$7c00
+	sta %dst
+	lda #>$7c00
+	sta %dst+1
+	
+	ldy #0
+loop
+	lda (%src),y
+	sta (%dst),y
+	iny
+	bne loop
+	
+	inc %src+1
+	inc %dst+1
+	
+	lda %dst+1
+	cmp #>$8000
+	bcc loop
+	
+	rts
+	.ctxend
+
+endpic_bytes
+	.include "../end-banner/bytes.txt"
+	.dsb 40,0
 
 selectpal
 	.word pal0

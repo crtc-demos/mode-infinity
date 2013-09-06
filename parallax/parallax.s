@@ -365,7 +365,7 @@ loop
 done:
 	rts
 setminf:
-	.asc "*B.",13,"BASIC",13,13,">MODE /0",13,0
+	.asc ">MODE /0",13,0
 	.ctxend
 	
 	.context adding_colours

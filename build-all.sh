@@ -60,6 +60,8 @@ pushd vgmproc
 ./compile.sh
 popd
 
+cp -f '!boot' '!boot.inf' $OUTPUTDISK
+
 pushd tmpdisk
 for x in *.inf; do
   read name base run < $x
