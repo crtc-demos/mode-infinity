@@ -75,3 +75,9 @@ $BBCIM -new demodisk.ssd
 pushd tmpdisk
 $BBCIM -a ../demodisk.ssd *
 popd
+
+rm -rf mode-infinity
+mkdir mode-infinity
+cp demodisk.ssd mode-infinity/mode-infinity.ssd
+cp README mode-infinity/README
+tar fcvz mode-infinity.tar.gz mode-infinity
