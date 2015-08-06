@@ -5,6 +5,7 @@ type commands =
   | Set_vol of int * int
   | Set_tone of int * int
   | Wait of int
+  | Loop_point
   | End_of_sound
   | Unknown of int
 
@@ -16,6 +17,7 @@ let string_of_cmd = function
   | Data_byte n -> Printf.sprintf "Data byte %d" n
   | Wait n -> Printf.sprintf "Wait %d samples" n
   | End_of_sound -> "End of sound"
+  | Loop_point -> "Loop point"
   | Unknown n -> Printf.sprintf "Unknown command 0x%2x" n
 
 let merge_databytes cmdstream =
@@ -199,9 +201,11 @@ let run_conversion cmdstream chan timestep beat peht veht pitch_ht =
       match cmds with
         [] -> all
       | Set_tone (c, n) :: rest when c = chan ->
+          (*Printf.printf "current time: %d, set tone\n" cur_time;*)
           scan rest cur_time song_time zero_pitch (pitch_idx n) cur_vol
 	       cur_beat acc all
       | Set_vol (c, n) :: rest when c = chan ->
+          (*Printf.printf "current time: %d, set volume\n" cur_time;*)
 	  scan rest cur_time song_time zero_pitch cur_pitch n cur_beat acc all
       | Wait w :: rest ->
 	  scan rest cur_time (song_time + w) zero_pitch cur_pitch cur_vol
@@ -212,10 +216,24 @@ let run_conversion cmdstream chan timestep beat peht veht pitch_ht =
     end in
   List.rev (scan cmdstream 0 0 0 0 0 0 [] [])
 
+let find_loop_pt_beat cmdstream timestep beat =
+  let rec scan curtime found_pt = function
+    [] -> found_pt
+  | Wait w :: rest -> scan (curtime + w) found_pt rest
+  | Loop_point :: rest ->
+      scan curtime (Some (curtime / (timestep * beat))) rest
+  | _ :: rest -> scan curtime found_pt rest in
+  scan 0 None cmdstream
+
+let rec take n fromlist =
+  match n, fromlist with
+    0, [] -> []
+  | _, [] -> []
+  | 0, fromlist -> []
+  | n, f::fs -> f::take (n - 1) fs
+
 let convert_file filename =
-  let tick = 735
-  and beat_len = 18
-  and origin = 0x8000
+  let origin = 0x8000
   and prefix = "song_" in
   let fh = open_in_bin filename in
   let inlen = in_channel_length fh in
@@ -238,11 +256,30 @@ let convert_file filename =
   let data_offset = get_dword 0x34 in
   let data_offset =
     if data_offset = 0l then 0x40l else Int32.add data_offset 0x34l in
+  let rate = (* get_dword 0x24 *) 50l in
+  let tick =
+    Printf.fprintf stderr "File specifies rate of %ldHz\n" rate;
+    match rate with
+      0l -> 882
+    | _ -> Int32.to_int (Int32.div 44100l rate) in
+  let loop_pt = get_dword 0x1c
+  and loop_samps = get_dword 0x20 in
+  let have_loop_pt = loop_pt > 0l in
+  let loop_pt_abs = Int32.to_int (Int32.add loop_pt 0x1cl) in
+  Printf.fprintf stderr "Loop point: %lx\n" loop_pt;
+  Printf.fprintf stderr "Loop samples: %lx\n" loop_samps;
+  let version = get_dword 0x8 in
+  Printf.fprintf stderr "VGM format version %.8lx\n" version;
   (*Printf.printf "Data starts at: %ld\n" data_offset;*)
   let idx = ref (Int32.to_int data_offset) in
   let found_end = ref false in
+  let found_loop_pt = ref false in
   let outlist = ref [] in
-  while !idx < inlen && not !found_end do
+  while !idx < inlen && (have_loop_pt || not !found_end) do
+    if have_loop_pt && not !found_loop_pt && !idx >= loop_pt_abs then begin
+      outlist := Loop_point :: !outlist;
+      found_loop_pt := true
+    end;
     let cmd, cmdlen =
       match get_byte !idx with
 	0x50 ->
@@ -287,20 +324,53 @@ let convert_file filename =
       (*Printf.printf "%d -> %d\n" freq !fidx;*)
       incr fidx)
     freqtab;
-  let ll0 = volume_envelopes outlist 0 tick beat_len
-  and ll1 = volume_envelopes outlist 1 tick beat_len
-  and ll2 = volume_envelopes outlist 2 tick beat_len
-  and ll3 = volume_envelopes outlist 3 tick beat_len in
-  let vol_env = uniquify_envelopes [ll0; ll1; ll2; ll3] in
-  let pe0 = pitch_envelopes outlist 0 tick beat_len fht
-  and pe1 = pitch_envelopes outlist 1 tick beat_len fht
-  and pe2 = pitch_envelopes outlist 2 tick beat_len fht
-  and pe3 = pitch_envelopes outlist 3 tick beat_len fht in
-  let pitch_env = uniquify_envelopes [pe0; pe1; pe2; pe3] in
-  let c0 = run_conversion outlist 0 tick beat_len pitch_env vol_env fht
-  and c1 = run_conversion outlist 1 tick beat_len pitch_env vol_env fht
-  and c2 = run_conversion outlist 2 tick beat_len pitch_env vol_env fht
-  and c3 = run_conversion outlist 3 tick beat_len pitch_env vol_env fht in
+  let try_conversion beat_len =
+    let ll0 = volume_envelopes outlist 0 tick beat_len
+    and ll1 = volume_envelopes outlist 1 tick beat_len
+    and ll2 = volume_envelopes outlist 2 tick beat_len
+    and ll3 = volume_envelopes outlist 3 tick beat_len in
+    let vol_env = uniquify_envelopes [ll0; ll1; ll2; ll3] in
+    let pe0 = pitch_envelopes outlist 0 tick beat_len fht
+    and pe1 = pitch_envelopes outlist 1 tick beat_len fht
+    and pe2 = pitch_envelopes outlist 2 tick beat_len fht
+    and pe3 = pitch_envelopes outlist 3 tick beat_len fht in
+    let pitch_env = uniquify_envelopes [pe0; pe1; pe2; pe3] in
+    let c0 = run_conversion outlist 0 tick beat_len pitch_env vol_env fht
+    and c1 = run_conversion outlist 1 tick beat_len pitch_env vol_env fht
+    and c2 = run_conversion outlist 2 tick beat_len pitch_env vol_env fht
+    and c3 = run_conversion outlist 3 tick beat_len pitch_env vol_env fht in
+    vol_env, pitch_env, c0, c1, c2, c3 in
+  let best_size = ref max_int
+  and best_num = ref None in
+  for i = 1 to 40 do
+    Printf.fprintf stderr "trying beat length %d: " i;
+    let v, p, c0, _, _, _ = try_conversion i in
+    let length = i * Hashtbl.length v + i * Hashtbl.length p
+		 + 12 * List.length c0 in
+    Printf.fprintf stderr "length: %d\n" length;
+    if length < !best_size then begin
+      best_size := length;
+      best_num := Some i
+    end
+  done;
+  (*let best_num = ref (Some 28) in*)
+  let beat_len =
+    match !best_num with
+      None -> failwith "Didn't find a best beat length"
+    | Some n -> n in
+  Printf.fprintf stderr "Best beat length: %d (%f frames per beat at 50Hz)\n"
+		 beat_len ((50. *. float_of_int beat_len)
+			   /. (Int32.to_float rate));
+  let loop_beat = find_loop_pt_beat outlist tick beat_len in
+  let loop_pt =
+    match loop_beat with
+      None -> Printf.fprintf stderr "No loop point\n"; 0
+    | Some b -> Printf.fprintf stderr "Loop point at beat %d\n" b; b in
+  let loop_len =
+    if have_loop_pt then
+      Int32.to_int loop_samps / (beat_len * tick)
+    else
+      0 in
   let rec output_song fo c0 c1 c2 c3 =
     match c0, c1, c2, c3 with
       (zp0, pei0, vei0) :: c0s,
@@ -313,11 +383,24 @@ let convert_file filename =
     | [], [], [], [] -> ()
     | _ -> Printf.fprintf stderr "Mismatched channel lengths!\n"; exit 1 in
   let fo = open_out Sys.argv.(2) in
+  let vol_env, pitch_env, c0, c1, c2, c3 = try_conversion beat_len in
+  let beat_total = loop_len + loop_pt in
+  Printf.fprintf stderr "Total beat length: %d (current %d)\n" beat_total
+		 (List.length c0);
+  let c0, c1, c2, c3 =
+    if beat_total = 0 then
+      c0, c1, c2, c3
+    else
+      take beat_total c0, take beat_total c1, take beat_total c2,
+      take beat_total c3 in
   Printf.fprintf fo "\t.org 0x%x\n" origin;
   Printf.fprintf fo "\t.word %sfreqtab\n" prefix;
   Printf.fprintf fo "\t.word %svolenv\n" prefix;
   Printf.fprintf fo "\t.word %spitchenv\n" prefix;
   Printf.fprintf fo "\t.word %snotes\n" prefix;
+  Printf.fprintf fo "\t.word %snotes+%d\n" prefix (12 * loop_pt);
+  Printf.fprintf fo "\t.word %send\n" prefix;
+  Printf.fprintf fo "\t.byte %d\n" beat_len;
   Printf.fprintf fo "%sfreqtab:\n" prefix;
   let ifht = Hashtbl.create 5 in
   Hashtbl.iter (fun k v -> Hashtbl.add ifht v k) fht;
@@ -343,6 +426,7 @@ let convert_file filename =
   done;
   Printf.fprintf fo "%snotes:\n" prefix;
   output_song fo c0 c1 c2 c3;
+  Printf.fprintf fo "%send:\n" prefix;
   close_out fo
   
   (*List.iter
